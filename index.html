@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Tower Builder</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0b0f1e;font-family:system-ui,sans-serif;color:#a0b8d0}
+#hud{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;gap:10px;padding:8px 14px;background:linear-gradient(180deg,rgba(11,15,30,0.92) 0%,transparent 100%);font-size:12px;pointer-events:none}
+#hud>*{pointer-events:auto}
+.hs{display:flex;align-items:center;gap:3px}
+.hv{color:#d0e4f8;font-variant-numeric:tabular-nums;min-width:40px}
+#hud-r{display:flex;gap:4px;margin-left:auto}
+#hud-r button{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#a0b8d0;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer}
+#hud-r button:hover{background:rgba(255,255,255,0.15)}
+#hud-r button.warn{background:rgba(239,68,68,0.25);border-color:rgba(239,68,68,0.3);color:#faa}
+#tt{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:none}
+.tt{background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.08);color:#d0e4f8;padding:5px 14px;border-radius:6px;font-size:12px;backdrop-filter:blur(4px);animation:ti .3s ease}
+.tt.bad{background:rgba(239,68,68,0.2);border-color:rgba(239,68,68,0.3);color:#f88}
+@keyframes ti{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+.overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;background:rgba(0,0,0,0.7);justify-content:center;align-items:center;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.overlay.show{display:flex}
+.opanel{background:#0f131c;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:20px 24px;max-width:92vw;max-height:85vh;overflow-y:auto;color:#c8d6e5;font-family:system-ui,sans-serif;font-size:13px;min-width:300px}
+.opanel h2{text-align:center;color:#7ac0ff;font-size:16px;margin-bottom:14px;font-weight:700}
+.srow{margin-bottom:10px}
+.srow label{display:flex;justify-content:space-between;color:#8a9aaa;font-size:12px;margin-bottom:3px}
+.srow label span{cursor:pointer;padding:0 4px;border-radius:3px}
+.srow label span:hover{background:rgba(255,255,255,0.06)}
+.srow label .sv{color:#d0e4f8;font-weight:600}
+.srow label .sv.editing{background:rgba(100,180,255,0.15);outline:1px solid rgba(100,180,255,0.3)}
+.srow input[type=range]{width:100%;height:4px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.1);border-radius:2px;outline:none;cursor:pointer}
+.srow input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#4a8aff;cursor:pointer;border:2px solid #6aaaff}
+.srow input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#4a8aff;cursor:pointer;border:2px solid #6aaaff}
+.sedit{background:transparent;border:none;color:#d0e4f8;font-family:monospace;font-size:12px;width:60px;text-align:right;outline:none;border-bottom:1px solid rgba(100,180,255,0.3)}
+.sedit:focus{border-bottom-color:#4a8aff}
+#diag-btn,#sett-btn{position:fixed;z-index:30;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#a0b8d0;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;line-height:1.4}
+#diag-btn{left:8px;bottom:50px}
+#sett-btn{left:8px;bottom:78px}
+</style></head>
+<body>
+<div id=hud><span class=hs>📐<span class=hv id=h-h>0</span></span><span class=hs>🧱<span class=hv id=h-b>0</span></span><span class=hs>💰<span class=hv id=h-$>50</span></span><span class=hs>⚡<span class=hv id=h-s style=color:#8c8>0%</span></span>
+<div id=hud-r><button id=b-up>⬆ Joint+</button><button id=b-spd>⚡ Speed+</button><button id=b-big>🏗️ Grid+</button><button id=b-r>📷 Reset</button><button id=b-restart style="background:rgba(239,68,68,0.25);border-color:rgba(239,68,68,0.3);color:#faa">🔄 Restart</button></div></div>
+<div id=tt></div>
+<div id=sett-btn onclick="toggleSett()">⚙️</div>
+<div id=diag-btn onclick="showDiag()">📊</div>
+<div id=sett-overlay class=overlay onclick="toggleSett()"><div class=opanel onclick="event.stopPropagation()"><h2>⚙️ Settings</h2><div id=sett-list></div><div style=text-align:center;margin-top:12px;color:#4a6a8a;font-size:11px>Tap a value to edit inline · Changes apply live</div></div></div>
+<div id=diag-overlay class=overlay onclick="copyDiag()"><div class=opanel onclick="event.stopPropagation()"><h2>📊 Tower Diagnostics</h2><div id=diag-content></div><div style=text-align:center;margin-top:14px;color:#4a6a8a;font-size:11px>Tap anywhere to copy</div></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+// TOWER BUILDER — v14.2 (Canvas 2D fallback + fixed placement speed)
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Error capture ──────────────────────────────────────────────────
+var _errors = [];
+window.onerror = function(msg, url, line, col, err) {
+  _errors.push({ msg: String(msg), url: url, line: line, col: col, stack: err && err.stack ? err.stack.split('\n').slice(0,3).join(' | ') : '' });
+  return false;
+};
+var _log = [];
+function logEv(tag, msg) { _log.push({ tag: tag, msg: String(msg), t: Date.now() }); if (_log.length > 200) _log.shift(); }
+logEv('boot', 'Page loaded');
+
+logEv('dep', 'THREE=' + (typeof THREE !== 'undefined' ? 'Y' : 'N'));
+logEv('dep', 'Matter=' + (typeof Matter !== 'undefined' ? 'Y' : 'N'));
+
+var Me = window.Matter;
+
+// ── Settings ────────────────────────────────────────────────────────
+var SETTINGS = {
+  gridSize:        { label:'Grid Size',        val:12, min:3,  max:50, step:1 },
+  grav:            { label:'Gravity',           val:0.45, min:0.05, max:5, step:0.05 },
+  placeSpeed:      { label:'Placement Speed',   val:1000, min:1,   max:50000, step:1, suffix:'/s' },
+  edgeStiff:       { label:'Vert Stiffness',    val:1.0,  min:0,   max:2, step:0.01 },
+  edgeDamp:        { label:'Vert Damping',      val:1.0,  min:0,   max:2, step:0.01 },
+  horizStiff:      { label:'Horiz Stiffness',   val:1.0,  min:0,   max:2, step:0.01 },
+  horizDamp:       { label:'Horiz Damping',     val:1.0,  min:0,   max:2, step:0.01 },
+  jointStrength:   { label:'Joint Strength',    val:350,  min:10,  max:5000, step:10 },
+  layerWeight:     { label:'Layer Weight',      val:5.0,  min:0.1, max:100, step:0.1 },
+  windStr:         { label:'Wind Strength',     val:1.0,  min:0,   max:10, step:0.1 },
+  collThreshold:   { label:'Collapse Threshold',val:1.1,  min:0.1, max:5, step:0.05 },
+  density:         { label:'Brick Density',     val:0.004, min:0.0001, max:0.05, step:0.0001, fmt:function(v){return v.toFixed(4);} },
+};
+
+try {
+  var saved = JSON.parse(localStorage.getItem('tower_settings_v2'));
+  if (saved && saved.gridSize && saved.gridSize > 2) SETTINGS.gridSize.val = saved.gridSize;
+  if (saved && saved.grav) SETTINGS.grav.val = saved.grav;
+  if (saved && saved.placeSpeed) SETTINGS.placeSpeed.val = saved.placeSpeed;
+  if (saved && saved.edgeStiff !== undefined) SETTINGS.edgeStiff.val = saved.edgeStiff;
+  if (saved && saved.edgeDamp !== undefined) SETTINGS.edgeDamp.val = saved.edgeDamp;
+  if (saved && saved.horizStiff !== undefined) SETTINGS.horizStiff.val = saved.horizStiff;
+  if (saved && saved.horizDamp !== undefined) SETTINGS.horizDamp.val = saved.horizDamp;
+  if (saved && saved.jointStrength) SETTINGS.jointStrength.val = saved.jointStrength;
+  if (saved && saved.layerWeight) SETTINGS.layerWeight.val = saved.layerWeight;
+  if (saved && saved.windStr !== undefined) SETTINGS.windStr.val = saved.windStr;
+  if (saved && saved.collThreshold) SETTINGS.collThreshold.val = saved.collThreshold;
+  if (saved && saved.density) SETTINGS.density.val = saved.density;
+} catch(e) {}
+
+function saveSettings() {
+  var o = {};
+  for (var k in SETTINGS) o[k] = SETTINGS[k].val;
+  try { localStorage.setItem('tower_settings_v2', JSON.stringify(o)); } catch(e) {}
+}
+
+// ── Game state ──────────────────────────────────────────────────────
+var G = SETTINGS.gridSize.val;
+var SP = 43, PH = 21, BH = 18, BD = 43;
+var GRAV = SETTINGS.grav.val;
+var EDGE_STIFF = SETTINGS.edgeStiff.val, EDGE_DAMP = SETTINGS.edgeDamp.val;
+var HORIZ_STIFF = SETTINGS.horizStiff.val, HORIZ_DAMP = SETTINGS.horizDamp.val;
+var FALL_CULL = 60000;
+var DENSITY = SETTINGS.density.val;
+
+var money = 50, maxH = 0, stressPct = 0;
+var upLvl = 0, spdLvl = 0, sizeLvl = 0;
+var nextId = 1, layerCount = 0, activeBricks = 0;
+var layers = [], constraints = [];
+var collapsing = false, collapseNotified = false;
+var totalBricks = 0, gameTime = 0, frameCount = 0, currentFps = 0;
+var fpsTimer2 = 0, brickRate = 0, rateTimer = 0, prevTotal = 0, hudTimer = 0;
+var prevMaxH = 0, hDropTimer = 0, breakCount = 0;
+var fragments = [];
+
+function strBase() { return SETTINGS.jointStrength.val + upLvl * 80; }
+function OFF() { return ((G - 1) * SP) / 2; }
+function layerWeight() { return SETTINGS.layerWeight.val; }
+function horizMaxForce() { return collapsing ? strBase() * 0.5 : strBase() * 20; }
+
+// ── Canvas 2D fallback ─────────────────────────────────────────────
+// Three.js is the only renderer
+var W = innerWidth, H = innerHeight;
+var drag = false, dl = {};
+
+// ── Three.js (try it but don't block) ──────────────────────────────
+var threeOk = false;
+var R3, S3, C3, W3;
+try {
+  if (typeof THREE !== 'undefined') {
+    R3 = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    R3.setSize(innerWidth, innerHeight);
+    R3.setPixelRatio(Math.min(devicePixelRatio, 2));
+    R3.setClearColor(0x000000, 0);
+    R3.domElement.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:1';
+    R3.setClearColor(0x1a2a3a, 1);
+    S3.background = new THREE.Color(0x2a3a5a);
+    document.body.appendChild(R3.domElement);
+    S3 = new THREE.Scene();
+    C3 = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 1, 100000);
+    S3.add(new THREE.AmbientLight(0x404060, 0.6));
+    S3.add(new THREE.HemisphereLight(0x87ceeb, 0x362d59, 0.4));
+    var sun = new THREE.DirectionalLight(0xffeedd, 1.5);
+    sun.position.set(500, 800, 400); S3.add(sun);
+    var fill = new THREE.DirectionalLight(0x8888ff, 0.4);
+    fill.position.set(-200, 100, -300); S3.add(fill);
+    W3 = new THREE.Group(); S3.add(W3);
+    threeOk = true;
+    logEv('three', 'Init OK');
+  } else {
+    logEv('three', 'THREE undefined');
+  }
+} catch(e) {
+  logEv('three', 'FAIL: ' + e.message);
+  _errors.push({msg:'Three.js: '+e.message});
+}
+
+// ── Matter.js Engine ─────────────────────────────────────────────────
+logEv('phys', 'Creating engine...');
+var engine = Me.Engine.create({
+  gravity: { x: 0, y: GRAV },
+  positionIterations: 40, velocityIterations: 35, constraintIterations: 50
+});
+Me.Composite.add(engine.world, Me.Bodies.rectangle(0, 25, 60000, 50, {
+  isStatic: true, label: 'ground', friction: 1.0, frictionStatic: 1.0, restitution: 0,
+  collisionFilter: { category: 0x0001 }
+}));
+logEv('phys', 'Engine OK');
+
+// ── Create slice ────────────────────────────────────────────────────
+function createSlice(li, ix) {
+  var id = nextId++, y = -PH / 2 - li * PH, px = ix * SP - OFF(), isBase = (li === 0);
+  var b = Me.Bodies.rectangle(px, y, SP, PH, {
+    density: DENSITY, friction: 0.8, frictionStatic: 0.8, frictionAir: 0.01,
+    restitution: 0, label: 'L' + li + 'x' + ix, isStatic: isBase,
+    collisionFilter: { category: 0x0001, mask: 0x0001 }
+  });
+  b._li = li; b._ix = ix; b._tid = id;
+  Me.Composite.add(engine.world, b);
+  if (!layers[li]) layers[li] = [];
+  var e = { id: id, body: b, meshes: [], layerIdx: li, ix: ix, alive: true, y: y, stress: 0, staticStress: 0, smoothedStress: 0 };
+  layers[li][ix] = e;
+
+  // Vertical
+  if (li > 0 && layers[li - 1] && layers[li - 1][ix] && layers[li - 1][ix].alive) {
+    var lo = layers[li - 1][ix];
+    for (var si = -1; si <= 1; si += 2) {
+      var c = Me.Constraint.create({
+        bodyA: b, bodyB: lo.body,
+        pointA: { x: si * SP / 2, y: PH / 2 }, pointB: { x: si * SP / 2, y: -PH / 2 },
+        stiffness: EDGE_STIFF, damping: EDGE_DAMP, length: 0
+      });
+      c._maxForce = strBase(); c._ids = [id, lo.id]; c._li = li; c._ix = ix; c._type = 'V';
+      constraints.push({ con: c, li: li });
+      Me.Composite.add(engine.world, c);
+    }
+  }
+
+  // Horizontal: check LEFT neighbor (already created, we iterate ix 0..G-1)
+  if (ix > 0 && layers[li] && layers[li][ix - 1] && layers[li][ix - 1].alive) {
+    var ri = layers[li][ix - 1];
+    for (var si = -1; si <= 1; si += 2) {
+      var c = Me.Constraint.create({
+        bodyA: b, bodyB: ri.body,
+        pointA: { x: -SP / 2, y: si * PH / 2 }, pointB: { x: SP / 2, y: si * PH / 2 },
+        stiffness: HORIZ_STIFF, damping: HORIZ_DAMP, length: 0
+      });
+      c._maxForce = horizMaxForce(); c._ids = [id, ri.id]; c._li = li; c._type = 'H';
+      constraints.push({ con: c, li: li });
+      Me.Composite.add(engine.world, c);
+    }
+  }
+  return e;
+}
+
+function startLayer() {
+  for (var ix = 0; ix < G; ix++) createSlice(layerCount, ix);
+  layerCount++;
+}
+
+function addMesh(e, ix, iz) {
+  var of = OFF(), mx = ix * SP - of, mz = iz * SP - of, BW = SP * 0.95;
+  if (threeOk && W3) {
+    try {
+      var m = new THREE.Mesh(new THREE.BoxGeometry(BW, BH, BD),
+        new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.6, metalness: 0.2 }));
+      m.position.set(mx, -e.y + BH, mz);
+      m._ix = ix; m._iz = iz; m._li = e.layerIdx;
+      W3.add(m); e.meshes.push(m); activeBricks++;
+    } catch(e) { logEv('mesh3', 'FAIL: ' + (e.message||'?')); }
+  }
+}
+
+var curLayer = -1, bricksInLayer = 0;
+function placeBrick() {
+  if (collapsing) return;
+  if (!engine) return;
+  if (curLayer < 0 || bricksInLayer >= G * G) {
+    curLayer = layerCount; startLayer(); bricksInLayer = 0;
+  }
+  var iz = bricksInLayer % G, ix = Math.floor(bricksInLayer / G);
+  var e = layers[curLayer] && layers[curLayer][ix];
+  if (e && e.alive) addMesh(e, ix, iz);
+  bricksInLayer++; totalBricks++;
+}
+
+// ── Stress ───────────────────────────────────────────────────────────
+function solveStress(dt) {
+  if (!engine) return;
+  var maxS = 0, lw = layerWeight(), layersAbove = 0;
+  for (var i = layers.length - 1; i >= 0; i--) {
+    var row = layers[i]; if (!row) continue;
+    for (var ix = 0; ix < G; ix++) {
+      var e = row[ix]; if (!e || !e.alive) continue;
+      e.staticStress = Math.min(2, layersAbove * lw / strBase() * (1 + ix * 0.05));
+    }
+    layersAbove++;
+  }
+
+  for (var ri = 0; ri < layers.length; ri++) { var row = layers[ri]; if (!row) continue;
+    for (var xi = 0; xi < row.length; xi++) { var e = row[xi]; if (!e || !e.alive) continue;
+      var dyn = Math.abs(e.body.angularVelocity) * 1.0 + Math.abs(e.body.angle) * 1.0;
+      var raw = Math.min(1.5, e.staticStress + dyn);
+      if (e.smoothedStress === undefined || e.smoothedStress === null) e.smoothedStress = raw;
+      e.smoothedStress = raw * 0.15 + e.smoothedStress * 0.85;
+      e.stress = e.smoothedStress;
+      if (e.stress > maxS) maxS = e.stress;
+    }
+  }
+
+  var collThresh = SETTINGS.collThreshold.val;
+  var broke = 0, brokeLayers = {};
+  for (var ci = 0; ci < constraints.length; ci++) {
+    var entry = constraints[ci]; if (!entry || !entry.con || entry.con._broken) continue;
+    var c = entry.con, li = c._li, row = layers[li]; if (!row) continue;
+    var ids = c._ids; if (!ids || ids.length < 2) continue;
+    var upperStress = 0;
+    for (var ri2 = 0; ri2 < layers.length; ri2++) { var r2 = layers[ri2]; if (!r2) continue;
+      for (var xi2 = 0; xi2 < r2.length; xi2++) { var e2 = r2[xi2]; if (e2 && e2.alive && e2.id === ids[0]) { upperStress = e2.stress; break; } }
+      if (upperStress > 0) break;
+    }
+    if (upperStress < 0.6) continue;
+    if (upperStress > 0.85) c._fat = (c._fat || 0) + dt * 0.5;
+    else c._fat = Math.max(0, (c._fat || 0) - dt * 0.3);
+    var threshold = (collapsing ? (c._type === 'H' ? 0.4 : 0.7) : collThresh) + (c._fat||0) * 0.1 - (c._collapseFat||0) * 0.05;
+    if (Math.random() < Math.max(0, upperStress - threshold) * Math.max(0, upperStress - threshold) * dt) {
+      c._broken = true; Me.Composite.remove(engine.world, c);
+      broke++; brokeLayers[li] = true;
+    }
+  }
+
+  for (var ci = 0; ci < constraints.length; ci++) {
+    if (constraints[ci] && constraints[ci].con && !constraints[ci].con._broken && brokeLayers[constraints[ci].li])
+      constraints[ci].con._fat = (constraints[ci].con._fat || 0) + 1.0;
+  }
+
+  if (collapsing) {
+    for (var ci = 0; ci < constraints.length; ci++) {
+      if (!constraints[ci] || !constraints[ci].con || constraints[ci].con._broken) continue;
+      if (constraints[ci].con._type === 'H') {
+        constraints[ci].con._collapseFat = (constraints[ci].con._collapseFat || 0) + dt * 8;
+        constraints[ci].con._maxForce = 10;
+      }
+    }
+  }
+
+  var col = false, mAV = 0, mLV = 0, mDX = 0;
+  for (var ri = 0; ri < layers.length; ri++) { var row = layers[ri]; if (!row) continue;
+    for (var xi = 0; xi < row.length; xi++) { var e = row[xi]; if (!e || !e.alive || e.body.isStatic) continue;
+      var av = Math.abs(e.body.angularVelocity), lv = Math.sqrt(e.body.velocity.x*e.body.velocity.x + e.body.velocity.y*e.body.velocity.y), dx = Math.abs(e.body.position.x);
+      if (av > mAV) mAV = av; if (lv > mLV) mLV = lv; if (dx > mDX) mDX = dx;
+    }
+  }
+  hDropTimer += dt;
+  if (hDropTimer > 2.5) { hDropTimer = 0; if (prevMaxH > 40 && maxH < prevMaxH * 0.75) col = true; prevMaxH = maxH; }
+  breakCount += broke; breakCount *= 0.95;
+  if (breakCount > 4 || mAV > 2.5 || mLV > 40 || mDX > SP * 10 || maxS > collThresh * 0.9) col = true;
+  if (!collapsing && col) {
+    collapsing = true;
+    var shoveDir = Math.random() > 0.5 ? 1 : -1;
+    for (var ri = 0; ri < layers.length; ri++) { var row = layers[ri]; if (!row) continue;
+      for (var xi = 0; xi < row.length; xi++) { var e = row[xi]; if (!e || !e.alive || e.body.isStatic) continue;
+        Me.Body.applyForce(e.body, e.body.position, { x: shoveDir * (0.001 + Math.max(0,-e.body.position.y)/100 * 0.0005) * e.body.mass, y: 0 });
+      }
+    }
+    if (!collapseNotified) { collapseNotified = true; toast('💥 COLLAPSE', 'bad'); }
+  }
+
+  for (var i = layers.length - 1; i >= 0; i--) { var row = layers[i]; if (!row) continue;
+    for (var xi = 0; xi < G; xi++) { var e = row[xi]; if (!e || !e.alive || e.body.isStatic) continue;
+      if (e.body.position.y > FALL_CULL) {
+        e.alive = false;
+        for (var ci = 0; ci < constraints.length; ci++) {
+          if (constraints[ci] && constraints[ci].con && !constraints[ci].con._broken && (constraints[ci].con._ids||[]).indexOf(e.id) >= 0) {
+            constraints[ci].con._broken = true; Me.Composite.remove(engine.world, constraints[ci].con);
+          }
+        }
+        Me.Composite.remove(engine.world, e.body);
+      }
+    }
+  }
+
+  var ty = 0;
+  for (var ri = 0; ri < layers.length; ri++) { var row = layers[ri]; if (!row) continue;
+    for (var xi = 0; xi < row.length; xi++) { var e = row[xi]; if (e && e.alive) { var h = -e.body.position.y + BH; if (h > ty) ty = h; } }
+  }
+  maxH = ty; stressPct = Math.min(100, Math.round(maxS * 100));
+}
+
+// ── Canvas 2D Render ───────────────────────────────────────────────
+
+// ── Sync 3D meshes (Three.js) ──────────────────────────────────────
+function sync3D(dt) {
+  if (!threeOk || !W3) return;
+  try {
+    for (var ri = 0; ri < layers.length; ri++) { var row = layers[ri]; if (!row) continue;
+      for (var xi = 0; xi < row.length; xi++) { var e = row[xi]; if (!e || !e.alive) continue;
+        var bx = e.body.position.x, by = e.body.position.y, ang = e.body.angle, ca = Math.cos(ang), sa = Math.sin(ang);
+        for (var mi = 0; mi < (e.meshes||[]).length; mi++) {
+          var m = e.meshes[mi]; if (!m) continue;
+          m.position.set(bx + BH*sa, -by + BH*ca, m._iz*SP - OFF());
+          m.rotation.z = -ang;
+          // Color by stress
+          var s = e.smoothedStress || 0, t = Math.min(1, s/1.2);
+          var r2, g2, b2;
+          if (t<0.5) { var u=t/0.5; r2=Math.floor(80+175*u); g2=Math.floor(200-80*u); b2=Math.floor(80-60*u); }
+          else { var u=(t-0.5)/0.5; r2=255; g2=Math.floor(120-120*u); b2=Math.floor(20-20*u); }
+          if (m.material) { m.material.color.setRGB(r2/255, g2/255, b2/255); }
+        }
+      }
+    }
+  } catch(e) { logEv('sync3D', String(e.message)); }
+}
+
+// ── Wind & economy ──────────────────────────────────────────────────
+var wPh = 0;
+function windTick(dt) {
+  if (!engine) return;
+  wPh += dt * 0.02;
+  var dir = Math.sin(wPh * Math.PI * 2);
+  var gust = 0.65 + 0.35 * Math.sin(wPh * 0.7 * Math.PI * 2);
+  var baseStr = SETTINGS.windStr.val * 0.00000035 * (1 + (maxH||1)/600) * gust;
+  for (var ri = 0; ri < layers.length; ri++) { var row = layers[ri]; if (!row) continue;
+    for (var xi = 0; xi < row.length; xi++) { var e = row[xi]; if (!e || !e.alive || e.body.isStatic) continue;
+      Me.Body.applyForce(e.body, e.body.position, { x: baseStr * dir * (1+Math.max(0,-e.body.position.y)/500) * 400, y: 0 });
+    }
+  }
+}
+
+function earn(dt) { money += 2 * (1 + maxH/30) * (1 + upLvl * 0.08) * dt; }
+
+// ── Camera ──────────────────────────────────────────────────────────
+var theta = 0.7, phi = 0.5, dist = 2500;
+function updateCam() {
+  // Canvas 2D camera: tower follows center
+  var ty = -Math.max(100, maxH * 0.5); // target Y
+  cx += (0 - cx) * 0.03;
+  cy += (ty - cy) * 0.03;
+  // Zoom: fit grid width and tower height in viewport
+  var zW = W * 0.72 / (G * SP + 80);
+  var zH = H * 0.65 / (maxH + PH * 4);
+  var targetZ = Math.min(zW, zH, 3);
+  cz += (Math.max(0.1, targetZ) - cz) * 0.06;
+  // Three.js camera
+  if (threeOk && C3) {
+    var ty3 = Math.max(60, maxH * 0.6);
+    var td3 = Math.max(1200, Math.min(300000, maxH * 1.8 + 1500));
+    dist += (td3 - dist) * 0.04;
+    C3.position.set(dist * Math.sin(theta) * Math.cos(phi), Math.max(150, dist * Math.sin(phi) + 200), dist * Math.cos(theta) * Math.cos(phi));
+    C3.lookAt(0, ty3, 0);
+  }
+}
+
+// ── Settings UI ────────────────────────────────────────────────────
+function toggleSett() {
+  var o = document.getElementById('sett-overlay');
+  o.classList.toggle('show');
+  if (o.classList.contains('show')) buildSettUI();
+}
+function buildSettUI() {
+  var list = document.getElementById('sett-list'); list.innerHTML = '';
+  for (var k in SETTINGS) {
+    var s = SETTINGS[k]; var fmt = s.fmt || function(v){return v;};
+    var row = document.createElement('div'); row.className = 'srow';
+    var sp = document.createElement('span'); sp.className = 'sv'; sp.id = 'sv-'+k;
+    sp.textContent = fmt(s.val)+(s.suffix||'');
+    sp.onclick = function(kk){return function(e){editSettVal(kk,e);};}(k);
+    var label = document.createElement('label');
+    label.innerHTML = s.label + ' '; label.appendChild(sp);
+    var inp = document.createElement('input');
+    inp.type = 'range'; inp.min = s.min; inp.max = s.max; inp.step = s.step; inp.value = s.val;
+    inp.oninput = function(kk){return function(){
+      var s2 = SETTINGS[kk]; if(!s2)return;
+      s2.val = parseFloat(this.value); if(s2.step>=1) s2.val=Math.round(s2.val);
+      applySett(kk);
+      var sp2 = document.getElementById('sv-'+kk); if(sp2) sp2.textContent=(s2.fmt||function(v){return v;})(s2.val)+(s2.suffix||'');
+    };}(k);
+    row.appendChild(label); row.appendChild(inp); list.appendChild(row);
+  }
+}
+function editSettVal(k, ev) { if(ev&&ev.stopPropagation) ev.stopPropagation();
+  var s=SETTINGS[k]; if(!s)return;
+  var sp=document.getElementById('sv-'+k); if(!sp)return;
+  sp.classList.add('editing');
+  var inp=document.createElement('input'); inp.type='text'; inp.className='sedit'; inp.value=String(s.val);
+  inp.onblur=function(){commitEdit(k,inp.value);sp.classList.remove('editing');};
+  inp.onkeydown=function(e){if(e.key==='Enter'){commitEdit(k,inp.value);sp.classList.remove('editing');}if(e.key==='Escape'){sp.classList.remove('editing');}};
+  sp.innerHTML=''; sp.appendChild(inp); inp.focus(); inp.select();
+}
+function commitEdit(k,raw){var s=SETTINGS[k];if(!s)return;var v=parseFloat(raw);if(isNaN(v))v=s.val;
+  v=Math.max(s.min,Math.min(s.max,v));if(s.step>=1)v=Math.round(v);else v=Math.round(v/s.step)*s.step;
+  s.val=v;applySett(k);var fmt=s.fmt||function(v){return v;};
+  var sp=document.getElementById('sv-'+k);if(sp){sp.innerHTML='';sp.textContent=fmt(v)+(s.suffix||'');sp.classList.remove('editing');}saveSettings();
+}
+function applySett(k){var s=SETTINGS[k];if(!s)return;
+  switch(k){case'gridSize':G=s.val;break;case'grav':GRAV=s.val;if(engine)engine.gravity.y=GRAV;break;case'edgeStiff':EDGE_STIFF=s.val;break;case'edgeDamp':EDGE_DAMP=s.val;break;case'horizStiff':HORIZ_STIFF=s.val;break;case'horizDamp':HORIZ_DAMP=s.val;break;case'density':DENSITY=s.val;break;}
+  saveSettings();
+}
+
+// ── Diagnostics ────────────────────────────────────────────────────
+function buildDiag() {
+  var alive=0; for(var i=0;i<layers.length;i++){var row=layers[i];if(!row)continue;for(var j=0;j<row.length;j++){var e=row[j];if(e&&e.alive)alive++;}}
+  var mins=Math.floor(gameTime/60),secs=Math.floor(gameTime%60);
+  var cAlive=0;for(var i=0;i<constraints.length;i++){if(constraints[i]&&constraints[i].con&&!constraints[i].con._broken)cAlive++;}
+  var data=[["⏱ Time",mins+"m "+secs+"s"],["🖼 FPS",currentFps],["🧱 Bricks",totalBricks.toLocaleString()],["📐 Height",Math.floor(maxH/PH)+" layers"],["🔵 Active Bodies",alive],["📏 Grid",G+"×"+G],["🔗 Constraints",cAlive+"/"+constraints.length],["💰 Money",Math.floor(money).toLocaleString()],["⚡ Stress",stressPct+"%"],["💥 Collapsed?",collapsing?"YES":"no"],["⬆ Joint+",upLvl],["⚡ Speed+",spdLvl],["🏗️ Grid+",sizeLvl],["🐞 Version","v14.2"],["📡 3D",threeOk?"YES":"NO"],["📡 Errors",String(_errors.length)]];
+  if(_errors.length>0){data.push(['--- ERRORS ---','']);for(var i=0;i<Math.min(_errors.length,8);i++){var e=_errors[i];data.push(['⚠️ '+(i+1),e.msg.slice(0,100)+(e.line?':'+e.line:'')]);}}
+  if(_log.length>0){data.push(['--- LOG ---','']);for(var i=Math.max(0,_log.length-10);i<_log.length;i++)data.push(["📝 "+_log[i].tag,_log[i].msg.slice(0,60)]);}
+  var html="";for(var i=0;i<data.length;i++)html+="<div style=display:flex;justify-content:space-between;gap:20px;padding:2px 0><span style=color:#8a9aaa>"+data[i][0]+"</span><span style=color:#d0e4f8>"+data[i][1]+"</span></div>";
+  document.getElementById("diag-content").innerHTML=html;
+  var txt="--- Tower Diagnostics ---\n";
+  for(var i=0;i<data.length;i++)txt+=data[i][0]+": "+data[i][1]+"\n";
+  txt+="URL: "+location.href+"\nUA: "+navigator.userAgent+"\nTime: "+new Date().toISOString()+"\n";return txt;
+}
+function showDiag(){document.getElementById("diag-overlay").classList.add("show");buildDiag();}
+function copyDiag(){var txt=buildDiag();try{navigator.clipboard.writeText(txt);}catch(e2){try{var ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();}catch(e3){}}
+  document.getElementById("diag-overlay").classList.remove("show");toast("📋 Copied!","blue");
+}
+
+// ── UI ──────────────────────────────────────────────────────────────
+function toast(m,t){var e=document.createElement('div');e.className='tt '+(t||'');e.textContent=m;
+  document.getElementById('tt').appendChild(e);setTimeout(function(){if(e.parentNode)e.parentNode.removeChild(e);},3000);}
+function updateHUD(){
+  document.getElementById('h-h').textContent=Math.floor(maxH);
+  document.getElementById('h-b').textContent=activeBricks;
+  document.getElementById('h-$').textContent=Math.floor(money);
+  var se=document.getElementById('h-s');
+  se.textContent=collapsing?'☠ COLLAPSE':stressPct+'%';
+  se.style.color=collapsing?'#f44':stressPct<40?'#8c8':stressPct<75?'#cc8':'#f88';
+  // Show error badge
+  var badge=document.getElementById('err-badge');
+  if(!badge&&_errors.length>0){badge=document.createElement('span');badge.id='err-badge';badge.style.cssText='color:#f44;font-size:11px;cursor:pointer;margin-left:6px';badge.onclick=function(){showDiag();};document.getElementById('hud').appendChild(badge);}
+  if(badge)badge.textContent=_errors.length>0?'🔴'+_errors.length:'';
+}
+
+function buyJoint(){if(collapsing){toast('Nope','bad');return;}var c=80*Math.pow(1.5,upLvl);if(money<c){toast('Need $'+Math.ceil(c),'bad');return;}if(upLvl>=25){toast('Max!','blue');return;}money-=c;upLvl++;toast('⬆ Lv'+upLvl+' +'+(upLvl*80),'blue');updateHUD();}
+function buySpeed(){if(collapsing){toast('Nope','bad');return;}var c=10*Math.pow(2,spdLvl);if(money<c){toast('Need $'+Math.ceil(c),'bad');return;}if(spdLvl>=15){toast('Max!','blue');return;}money-=c;spdLvl++;toast('⚡ Lv'+spdLvl,'blue');updateHUD();}
+function buyBigger(){if(collapsing){toast('Nope','bad');return;}var c=500*Math.pow(3,sizeLvl);if(money<c){toast('Need $'+Math.ceil(c),'bad');return;}if(sizeLvl>=4){toast('Max!','blue');return;}money-=c;sizeLvl++;G=12+sizeLvl*2;SETTINGS.gridSize.val=G;saveSettings();toast('🏗️ '+G+'×'+G,'blue');updateHUD();}
+
+function restartGame() {
+  if (engine) {
+    for (var i = constraints.length - 1; i >= 0; i--) {
+      if (constraints[i] && constraints[i].con) Me.Composite.remove(engine.world, constraints[i].con);
+    }
+    for (var ri = 0; ri < layers.length; ri++) { var row = layers[ri]; if (!row) continue;
+      for (var xi = 0; xi < row.length; xi++) { var e = row[xi]; if (e && e.body) Me.Composite.remove(engine.world, e.body); }
+    }
+  }
+  if (threeOk && W3) { while (W3.children.length > 0) W3.remove(W3.children[0]); }
+  layers.length = 0; constraints.length = 0; fragments.length = 0;
+  totalBricks = 0; activeBricks = 0; layerCount = 0; nextId = 1;
+  curLayer = -1; bricksInLayer = 0;
+  money = 50; maxH = 0; stressPct = 0;
+  upLvl = 0; spdLvl = 0; sizeLvl = 0;
+  collapsing = false; collapseNotified = false;
+  prevMaxH = 0; hDropTimer = 0; breakCount = 0;
+  gameTime = 0; currentFps = 0;
+  _errors.length = 0;
+  
+  placeBrick();
+  toast("🔄 Restarted!", "blue");
+  updateHUD();
+}
+
+document.getElementById('b-restart').onclick=restartGame;
+document.getElementById('b-up').onclick=buyJoint;document.getElementById('b-spd').onclick=buySpeed;document.getElementById('b-big').onclick=buyBigger;
+document.getElementById('b-r').onclick=function(){theta=0.7;phi=0.5;dist=2500;};
+
+// ── Input ────────────────────────────────────────────────────────────
+if (R3) R3.domElement.addEventListener('pointerdown',function(e){if(e.button===1||e.button===2){drag=true;dl={x:e.clientX,y:e.clientY};e.preventDefault();}});
+document.addEventListener('pointerup',function(){drag=false;});
+document.addEventListener('pointermove',function(e){if(drag){cx-=(e.clientX-dl.x)/cz;cy-=(e.clientY-dl.y)/cz;dl={x:e.clientX,y:e.clientY};}});
+if (R3) R3.domElement.addEventListener('wheel',function(e){e.preventDefault();dist=Math.max(500,Math.min(50000,dist*(e.deltaY<0?0.9:1.1)));},{passive:false});
+addEventListener('keydown',function(e){if(e.code==='KeyC'||e.code==='Escape'){cx=0;cy=0;cz=1;}});
+
+// ── Game Loop ───────────────────────────────────────────────────────
+logEv('loop','Starting...');
+placeBrick();
+toast('🧱 Tower rising...','blue');
+var last=0,acc=0,ct=0;
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  var dt = last ? Math.min((t - last) / 1000, 0.05) : 0.016; last = t;
+  gameTime += dt; frameCount++;
+
+  if (!collapsing && engine) {
+    earn(dt);
+    // FIXED: interval = 1/bricksPerSecond, not 1000/placeSpeed
+    acc += dt;
+    var interval = Math.max(0.001, 1.0 / SETTINGS.placeSpeed.val);
+    if (acc >= interval) { acc = 0; placeBrick(); }
+  }
+
+  if (engine) {
+    Me.Engine.update(engine, dt * 1000);
+    windTick(dt);
+    var angDamp = collapsing ? 0.97 : 0.85;
+    for (var ri = 0; ri < layers.length; ri++) { var row = layers[ri]; if (!row) continue;
+      for (var xi = 0; xi < row.length; xi++) { var e = row[xi]; if (e && e.alive && !e.body.isStatic) Me.Body.setAngularVelocity(e.body, e.body.angularVelocity * angDamp); }
+    }
+    solveStress(dt);
+  }
+
+  sync3D(dt);
+  updateCam();
+
+  hudTimer += dt; fpsTimer2 += dt; rateTimer += dt;
+  if (hudTimer > 0.15) { hudTimer = 0; updateHUD(); }
+  if (fpsTimer2 > 1.0) { fpsTimer2 = 0; currentFps = Math.round(frameCount); frameCount = 0; }
+  if (rateTimer > 1.0) { rateTimer = 0; brickRate = totalBricks - prevTotal; prevTotal = totalBricks; }
+
+  // Three.js render on top
+  if (threeOk && R3 && S3 && C3) R3.render(S3, C3);
+}
+
+logEv('loop','First render');
+loop(0);
+logEv('boot','v14.2 started');
+</script>
+</body></html>
+/* edited Sat Jul 11 10:36:51 AEST 2026 */

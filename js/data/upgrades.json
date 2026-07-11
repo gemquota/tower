@@ -1,0 +1,71 @@
+{
+  "$schema": "Upgrade definitions for Tower",
+  "description": "Each upgrade is keyed by a unique ID. Cost is computed as:\n  cost(resource) = baseCost[resource] * costMultiplier ^ currentLevel\nEffects are queried via EconomyManager.getEffectValue(effectType).",
+  "notes": [
+    "tier groups upgrades into unlock layers (higher tiers require earlier tiers).",
+    "effectType is the key used by getEffectValue() to sum effects across upgrades.",
+    "baseValue + valuePerLevel * level = current magnitude for that effectType."
+  ],
+  "upgrades": [
+    {
+      "id": "reinforced_steel",
+      "name": "Reinforced Steel",
+      "description": "Reinforce every block with a steel lattice. Structural stress is reduced by 3 % per level, allowing taller towers before welds snap.",
+      "tier": 1,
+      "maxLevel": 50,
+      "baseCost": { "money": 100, "steel": 50 },
+      "costMultiplier": 1.15,
+      "effectType": "stress_reduction",
+      "baseValue": 0.03,
+      "valuePerLevel": 0.03
+    },
+    {
+      "id": "auto_builder",
+      "name": "Auto-Builder Drone",
+      "description": "A semi-autonomous drone stacks blocks at a steady rhythm. Reduces the interval between automatic placements by 0.15 s per level.",
+      "tier": 1,
+      "maxLevel": 20,
+      "baseCost": { "money": 250, "research": 10 },
+      "costMultiplier": 1.20,
+      "effectType": "auto_build_interval",
+      "baseValue": 2.0,
+      "valuePerLevel": -0.15
+    },
+    {
+      "id": "wind_dampener",
+      "name": "Wind Dampener",
+      "description": "Tuned mass dampers high in the tower cancel resonant wind sway. Wind force is reduced by 6 % per level.",
+      "tier": 2,
+      "maxLevel": 15,
+      "baseCost": { "money": 800, "steel": 300, "research": 50 },
+      "costMultiplier": 1.25,
+      "effectType": "wind_resistance",
+      "baseValue": 0.06,
+      "valuePerLevel": 0.06
+    },
+    {
+      "id": "advanced_alloys",
+      "name": "Advanced Alloys",
+      "description": "High‑strength alloy blends increase each block's health pool by 10 % per level, delaying fatigue failure.",
+      "tier": 2,
+      "maxLevel": 30,
+      "baseCost": { "money": 600, "steel": 400, "research": 30 },
+      "costMultiplier": 1.22,
+      "effectType": "block_health",
+      "baseValue": 0.10,
+      "valuePerLevel": 0.10
+    },
+    {
+      "id": "prestige_amplifier",
+      "name": "Prestige Amplifier",
+      "description": "Advanced computational models extract more value from each prestige cycle. Adds 5 % more prestige tokens per reset per level.",
+      "tier": 3,
+      "maxLevel": 10,
+      "baseCost": { "money": 5000, "steel": 2000, "research": 1000 },
+      "costMultiplier": 1.30,
+      "effectType": "prestige_amplifier",
+      "baseValue": 0.05,
+      "valuePerLevel": 0.05
+    }
+  ]
+}

@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Tower Builder</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0b0f1e;font-family:system-ui,sans-serif;color:#a0b8d0}
+canvas{display:block;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;gap:10px;padding:8px 14px;background:linear-gradient(180deg,rgba(11,15,30,0.92) 0%,transparent 100%);font-size:12px;pointer-events:none}
+#hud>*{pointer-events:auto}
+.hs{display:flex;align-items:center;gap:3px}
+.hv{color:#d0e4f8;font-variant-numeric:tabular-nums;min-width:40px}
+#hud-r{display:flex;gap:4px;margin-left:auto}
+#hud-r button{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#a0b8d0;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer}
+#hud-r button:hover{background:rgba(255,255,255,0.15)}
+#hud-r button.warn{background:rgba(239,68,68,0.25);border-color:rgba(239,68,68,0.3);color:#faa}
+#tt{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:none}
+.tt{background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.08);color:#d0e4f8;padding:5px 14px;border-radius:6px;font-size:12px;backdrop-filter:blur(4px);animation:ti .3s ease}
+.tt.bad{background:rgba(239,68,68,0.2);border-color:rgba(239,68,68,0.3);color:#f88}
+@keyframes ti{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+</style></head>
+<body>
+<div id=hud><span class=hs>📐<span class=hv id=h-h>0</span></span><span class=hs>🧱<span class=hv id=h-b>0</span></span><span class=hs>💰<span class=hv id=h-$>50</span></span><span class=hs>⚡<span class=hv id=h-s style=color:#8c8>0%</span></span>
+<div id=hud-r><button id=b-up>⬆ Joint+</button><button id=b-spd>⚡ Speed+</button><button id=b-big>🏗️ Grid+</button><button id=b-r>📷 Reset</button></div></div>
+<div id=tt></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+// TOWER BUILDER — v13 (fixed camera, stress colors, collapse fragmentation)
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Key fixes vs v12:
+//   - Camera zooms out faster/further to always show tower top
+//   - Stress color: fixed smoothing bug (was accumulating!), simplified to G→Y→R
+//   - Collapse: bricks visually fragment — each mesh gets independent physics
+//     during collapse, flying apart for "breaking into smaller pieces" feel
+//   - Collapse thresholds raised (lower stress sensitivity) so tower sways
+//     longer before falling
+//   - Wind reduced for more gradual sway build-up
+
+const Me = window.Matter;
+let G = 3;
+const SP = 43, PH = 21, BH = 18, BD = 43;
+const GRAV = 0.45;
+const POS_ITERS = 40, VEL_ITERS = 35, CON_ITERS = 50;
+const EDGE_STIFF = 1.0, EDGE_DAMP = 1.0, HORIZ_STIFF = 1.0, HORIZ_DAMP = 1.0;
+const FALL_CULL = 60000;
+
+let money = 50, maxH = 0, stressPct = 0;
+let upLvl = 0, spdLvl = 0, sizeLvl = 0;
+let nextId = 1, layerCount = 0, activeBricks = 0;
+const layers = [];     // layers[li][ix] = {id,body,meshes:[],alive,y,stress,staticStress}
+const constraints = []; // {con, li}
+
+let collapsing = false, collapseNotified = false;
+let prevMaxH = 0, hDropTimer = 0;
+let breakCount = 0;
+const fragments = [];       // {mesh,vx,vy,vz,rx,ry,rz,life}
+
+function strBase() { return 350 + upLvl * 80; }
+function OFF() { return ((G - 1) * SP) / 2; }
+function layerWeight() { return G * G * 0.0003 * G * SP * PH * GRAV; }
+function horizMaxForce() { return collapsing ? strBase() * 0.5 : strBase() * 20; }
+
+// ── Matter.js Engine ─────────────────────────────────────────────────
+const engine = Me.Engine.create({
+  gravity: { x: 0, y: GRAV },
+  positionIterations: POS_ITERS, velocityIterations: VEL_ITERS, constraintIterations: CON_ITERS
+});
+Me.Composite.add(engine.world, Me.Bodies.rectangle(0, 25, 60000, 50, {
+  isStatic: true, label: 'ground', friction: 1.0, frictionStatic: 1.0, restitution: 0,
+  collisionFilter: { category: 0x0001 }
+}));
+
+// ── Three.js ─────────────────────────────────────────────────────────
+const R = new THREE.WebGLRenderer({ antialias: true });
+R.setSize(innerWidth, innerHeight);
+R.setPixelRatio(Math.min(devicePixelRatio, 2));
+R.setClearColor(0x0b0f1e, 1);
+R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.prepend(R.domElement);
+const S = new THREE.Scene(); S.fog = new THREE.Fog(0x0b0f1e, 30000, 60000);
+const C = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 1, 100000);
+S.add(new THREE.AmbientLight(0x404060, 0.5));
+S.add(new THREE.HemisphereLight(0x87ceeb, 0x362d59, 0.3));
+const sun = new THREE.DirectionalLight(0xffeedd, 1.2);
+sun.position.set(500, 800, 400); sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096); sun.shadow.camera.near = 1; sun.shadow.camera.far = 5000;
+sun.shadow.camera.left = -3000; sun.shadow.camera.right = 3000;
+sun.shadow.camera.top = 3000; sun.shadow.camera.bottom = -3000;
+S.add(sun);
+const fill = new THREE.DirectionalLight(0x8888ff, 0.3);
+fill.position.set(-200, 100, -300); S.add(fill);
+const W = new THREE.Group(); S.add(W);
+const gh = new THREE.GridHelper(20000, 200, 0x152040, 0x0a1020);
+gh.position.y = -2; W.add(gh);
+
+// ── Create one column-slice body ─────────────────────────────────────
+function createSlice(li, ix) {
+  const id = nextId++, y = -PH / 2 - li * PH, px = ix * SP - OFF(), isBase = (li === 0);
+  const b = Me.Bodies.rectangle(px, y, SP, PH, {
+    density: G * 0.001, friction: 0.8, frictionStatic: 0.8, frictionAir: 0.01,
+    restitution: 0, label: 'L' + li + 'x' + ix, isStatic: isBase,
+    collisionFilter: { group: -1, category: 0x0001, mask: 0x0001 }
+  });
+  b._li = li; b._ix = ix; b._tid = id;
+  Me.Composite.add(engine.world, b);
+  if (!layers[li]) layers[li] = [];
+  const e = { id, body: b, meshes: [], layerIdx: li, ix, alive: true, y, stress: 0, staticStress: 0, smoothedStress: 0 };
+  layers[li][ix] = e;
+
+  // VERTICAL: 2 edge constraints to slice below (same ix)
+  if (li > 0 && layers[li - 1] && layers[li - 1][ix] && layers[li - 1][ix].alive) {
+    const lo = layers[li - 1][ix];
+    for (const s of [-1, 1]) {
+      const c = Me.Constraint.create({
+        bodyA: b, bodyB: lo.body,
+        pointA: { x: s * SP / 2, y: PH / 2 }, pointB: { x: s * SP / 2, y: -PH / 2 },
+        stiffness: EDGE_STIFF, damping: EDGE_DAMP, length: 0
+      });
+      c._maxForce = strBase(); c._ids = [id, lo.id]; c._li = li; c._ix = ix; c._type = 'V';
+      constraints.push({ con: c, li: li });
+      Me.Composite.add(engine.world, c);
+    }
+  }
+
+  // HORIZONTAL: 2 edge constraints to adjacent slice (same li, ix+1)
+  if (layers[li] && layers[li][ix + 1] && layers[li][ix + 1].alive) {
+    const ri = layers[li][ix + 1];
+    for (const s of [-1, 1]) {
+      const c = Me.Constraint.create({
+        bodyA: b, bodyB: ri.body,
+        pointA: { x: SP / 2, y: s * PH / 2 }, pointB: { x: -SP / 2, y: s * PH / 2 },
+        stiffness: HORIZ_STIFF, damping: HORIZ_DAMP, length: 0
+      });
+      c._maxForce = horizMaxForce(); c._ids = [id, ri.id]; c._li = li; c._type = 'H';
+      constraints.push({ con: c, li: li });
+      Me.Composite.add(engine.world, c);
+    }
+  }
+  return e;
+}
+
+// ── Layer & brick management ─────────────────────────────────────────
+function startLayer() {
+  for (let ix = 0; ix < G; ix++) createSlice(layerCount, ix);
+  layerCount++;
+}
+
+function addMesh(e, ix, iz) {
+  const of = OFF(), mx = ix * SP - of, mz = iz * SP - of, BW = SP * 0.95;
+  const m = new THREE.Mesh(new THREE.BoxGeometry(BW, BH, BD),
+    new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.6, metalness: 0.2, emissive: 0x000000, emissiveIntensity: 0.6 }));
+  m.position.set(mx, -e.y + BH, mz); m.castShadow = true; m.receiveShadow = true;
+  m._ix = ix; m._iz = iz; m._li = e.layerIdx;
+  W.add(m); e.meshes.push(m); activeBricks++;
+}
+
+let curLayer = -1, bricksInLayer = 0;
+function placeBrick() {
+  if (collapsing) return;
+  if (curLayer < 0 || bricksInLayer >= G * G) { curLayer = layerCount; startLayer(); bricksInLayer = 0; }
+  const iz = bricksInLayer % G, ix = Math.floor(bricksInLayer / G);
+  const e = layers[curLayer] && layers[curLayer][ix];
+  if (e && e.alive) addMesh(e, ix, iz);
+  bricksInLayer++;
+}
+
+// ── Stress + Break + Collapse ────────────────────────────────────────
+function solveStress(dt) {
+  let maxS = 0;
+
+  // 1. Static stress per slice (weight above / strength)
+  const lw = layerWeight();
+  let layersAbove = 0;
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const row = layers[i]; if (!row) continue;
+    for (let ix = 0; ix < G; ix++) {
+      const e = row[ix]; if (!e || !e.alive) continue;
+      e.staticStress = Math.min(2, layersAbove * lw / strBase() * (1 + ix * 0.05));
+    }
+    layersAbove++;
+  }
+
+  // 2. Total stress = static + dynamic, with exponential smoothing
+  //    Smoothed = raw * 0.15 + prev * 0.85  ←  prevents oscillating rainbow colors
+  const SMOOTH = 0.85;
+  for (const row of layers) { if (!row) continue;
+    for (const e of row) { if (!e || !e.alive) continue;
+      // Dynamic stress: reduced multipliers so tower can sway longer
+      const dyn = Math.abs(e.body.angularVelocity) * 1.0 + Math.abs(e.body.angle) * 1.0;
+      const raw = Math.min(1.5, e.staticStress + dyn);
+      e.smoothedStress = e.smoothedStress || raw;
+      e.smoothedStress = raw * (1 - SMOOTH) + e.smoothedStress * SMOOTH;
+      e.stress = e.smoothedStress;
+      if (e.stress > maxS) maxS = e.stress;
+    }
+  }
+
+  // 3. Probabilistic constraint breaking
+  let broke = 0;
+  const brokeLayers = new Set();
+  for (const entry of constraints) {
+    if (!entry || !entry.con || entry.con._broken) continue;
+    const c = entry.con;
+    const li = c._li; const row = layers[li]; if (!row) continue;
+    const ids = c._ids; if (!ids || ids.length < 2) continue;
+    let upperStress = 0;
+    for (const r of layers) { if (!r) continue;
+      for (const e of r) { if (e && e.alive && e.id === ids[0]) { upperStress = e.stress; break; } }
+      if (upperStress > 0) break;
+    }
+    // Raised minimum stress threshold for breaking
+    if (upperStress < 0.6) continue;
+
+    if (upperStress > 0.85) { c._fat = (c._fat || 0) + dt * 0.5; }
+    else c._fat = Math.max(0, (c._fat || 0) - dt * 0.3);
+
+    const fatigueBonus = (c._fat || 0) * 0.1;
+    // During collapse: lower thresholds so both H and V bonds snap
+    const baseThreshold = collapsing ? (c._type === 'H' ? 0.4 : 0.7) : 1.10;
+    const collapseFat = (c._collapseFat || 0);
+    const threshold = baseThreshold + fatigueBonus - collapseFat * 0.05;
+    const excess = Math.max(0, upperStress - threshold);
+    const breakProb = excess * excess * dt * 1;
+    if (Math.random() < breakProb) {
+      c._broken = true; Me.Composite.remove(engine.world, c);
+      broke++; brokeLayers.add(li);
+    }
+  }
+
+  // 4. Cascade: nearby constraints get fatigue bonus
+  for (const entry of constraints) {
+    if (!entry || !entry.con || entry.con._broken) continue;
+    if (brokeLayers.has(entry.li)) { entry.con._fat = (entry.con._fat || 0) + 1.0; }
+  }
+
+  // 5. On collapse: break horizontal bonds so tower separates into column chunks.
+  //    Each horizontal bond has a per-frame ~60%/s break chance during collapse.
+  if (collapsing) {
+    for (const entry of constraints) {
+      if (!entry || !entry.con || entry.con._broken) continue;
+      if (entry.con._type === 'H') {
+        // Lower the effective stress threshold for horizontal bonds during collapse
+        // so the excess-based breaking kicks in immediately
+        entry.con._collapseFat = (entry.con._collapseFat || 0) + dt * 8;
+        // Also reduce maxForce to near-zero so any force snaps them
+        entry.con._maxForce = 10;
+      }
+    }
+  }
+
+  // 6. Collapse detection (raised thresholds for longer sway)
+  let col = false, mAV = 0, mLV = 0, mDX = 0;
+  for (const row of layers) { if (!row) continue;
+    for (const e of row) { if (!e || !e.alive || e.body.isStatic) continue;
+      const av = Math.abs(e.body.angularVelocity), lv = Math.sqrt(e.body.velocity.x ** 2 + e.body.velocity.y ** 2), dx = Math.abs(e.body.position.x);
+      if (av > mAV) mAV = av; if (lv > mLV) mLV = lv; if (dx > mDX) mDX = dx;
+    }
+  }
+  hDropTimer += dt;
+  if (hDropTimer > 2.5) { hDropTimer = 0; if (prevMaxH > 40 && maxH < prevMaxH * 0.75) col = true; prevMaxH = maxH; }
+  breakCount += broke; breakCount *= 0.95;
+  if (breakCount > 4 || mAV > 2.5 || mLV > 40 || mDX > SP * 10 || maxS > 1.3) col = true;
+  if (!collapsing && col) {
+    collapsing = true;
+    // Give all bodies a lateral shove to tip the tower over
+    const shoveDir = Math.random() > 0.5 ? 1 : -1;
+    for (const row of layers) { if (!row) continue;
+      for (const e of row) { if (!e || !e.alive || e.body.isStatic) continue;
+        const alt = Math.max(0, -e.body.position.y) / 100;
+        Me.Body.applyForce(e.body, e.body.position, {
+          x: shoveDir * (0.001 + alt * 0.0005) * e.body.mass,
+          y: 0
+        });
+      }
+    }
+    if (!collapseNotified) { collapseNotified = true; toast('💥 COLLAPSE', 'bad'); }
+  }
+
+  // 7. Ground impact — bodies past FALL_CULL shatter into flying brick fragments
+  for (let i = layers.length - 1; i >= 0; i--) { const row = layers[i]; if (!row) continue;
+    for (let ix = 0; ix < G; ix++) { const e = row[ix]; if (!e || !e.alive || e.body.isStatic) continue;
+      if (e.body.position.y > FALL_CULL) {
+        e.alive = false;
+        for (const entry of constraints) {
+          if (entry && entry.con && !entry.con._broken && (entry.con._ids || []).includes(e.id)) {
+            entry.con._broken = true; Me.Composite.remove(engine.world, entry.con);
+          }
+        }
+        // Shatter on impact: meshes become flying fragments
+        for (const m of (e.meshes || [])) {
+          fragments.push({
+            mesh: m,
+            vx: (Math.random() - 0.5) * 400,
+            vy: Math.random() * 200 + 80,
+            vz: (Math.random() - 0.5) * 400,
+            rx: (Math.random() - 0.5) * 6,
+            ry: (Math.random() - 0.5) * 6,
+            rz: (Math.random() - 0.5) * 6,
+            life: 5 + Math.random() * 3
+          });
+        }
+        e.meshes = []; Me.Composite.remove(engine.world, e.body);
+      }
+    }
+  }
+
+  // Update maxH from alive bodies
+  let ty = 0;
+  for (const row of layers) { if (!row) continue;
+    for (const e of row) { if (e && e.alive) { const h = -e.body.position.y + BH; if (h > ty) ty = h; } }
+  }
+  maxH = ty; stressPct = Math.min(100, Math.round(maxS * 100));
+}
+
+
+
+function updateFragments(dt) {
+  let allDead = true;
+  for (const f of fragments) {
+    f.life -= dt;
+    if (f.life <= 0) {
+      if (f.mesh.parent) W.remove(f.mesh);
+      continue;
+    }
+    allDead = false;
+    f.vy -= 350 * dt; // gravity
+    f.mesh.position.x += f.vx * dt;
+    f.mesh.position.y += f.vy * dt;
+    f.mesh.position.z += f.vz * dt;
+    f.mesh.rotation.x += f.rx * dt;
+    f.mesh.rotation.y += f.ry * dt;
+    f.mesh.rotation.z += f.rz * dt;
+    // Fade out in last second
+    if (f.life < 1) f.mesh.material.opacity = f.life;
+  }
+  return allDead;
+}
+
+// ── Colors — simplified GREEN→YELLOW→RED based on smoothed stress ──
+function updateColors() {
+  for (const row of layers) { if (!row) continue;
+    for (const e of row) { if (!e || !e.alive) continue;
+      const s = e.smoothedStress || 0;
+      // t = 0..1 where 1 = critical stress
+      const t = Math.min(1, s / 1.2);
+      let r, g, b;
+      if (t < 0.5) {
+        // Green → Yellow (t: 0→0.5)
+        const u = t / 0.5;
+        r = Math.floor(80 + 175 * u);
+        g = Math.floor(200 - 80 * u);
+        b = Math.floor(80 - 60 * u);
+      } else {
+        // Yellow → Red (t: 0.5→1)
+        const u = (t - 0.5) / 0.5;
+        r = Math.floor(255);
+        g = Math.floor(120 - 120 * u);
+        b = Math.floor(20 - 20 * u);
+      }
+      const col = (Math.min(255, r) << 16) + (Math.min(255, g) << 8) + Math.min(255, b);
+      const ei = Math.min(s * 3, 1.5);
+      const er = Math.min(255, r * ei);
+      const eg = Math.min(255, g * ei * 0.3);
+      const eb = Math.min(255, b * ei * 0.1);
+      const em = (Math.floor(er) << 16) + (Math.floor(eg) << 8) + Math.floor(eb);
+      for (const m of (e.meshes || [])) {
+        if (m.material) { m.material.color.setHex(col); m.material.emissive.setHex(em); m.material.emissiveIntensity = 0.15 + s; }
+      }
+    }
+  }
+}
+
+// ── Sync 3D meshes to Matter.js bodies ──────────────────────────────
+function sync3D(dt) {
+  // Update flying fragments (from ground impact shattering)
+  updateFragments(dt);
+  // Sync regular bodies — tower falls as column-slice chunks during collapse
+  for (const row of layers) { if (!row) continue;
+    for (const e of row) { if (!e || !e.alive) continue;
+      const bx = e.body.position.x, by = e.body.position.y, ang = e.body.angle, ca = Math.cos(ang), sa = Math.sin(ang);
+      for (const m of (e.meshes || [])) {
+        const mz = m._iz * SP - OFF();
+        // Mesh at body X center (lx=0), BH above body center (ly=BH in 3D Y-up).
+        // Matter.js Y is +down: BH above = -BH in Matter Y.
+        // Rotated: X_off = 0*cos - (-BH)*sin = BH*sin(ang)
+        //          Y_off = 0*sin + (-BH)*cos = -BH*cos(ang)
+        // THREE.js Y-up: X = bx + BH*sin(ang), Y = -(by - BH*cos(ang)) = -by + BH*cos(ang)
+        m.position.set(bx + BH * sa, -by + BH * ca, mz);
+        m.rotation.z = -ang;
+      }
+    }
+  }
+}
+
+// ── Wind & economy ────────────────────────────────────────────────────
+let wAcc = 0, wDir = 1, wPh = 0;
+function windTick(dt) {
+  // Continuous gentle wind with smooth sine variation (no sudden direction flips).
+  // Phase evolves slowly for a natural sway buildup.
+  wPh += dt * 0.02;
+  // Smooth direction: -1..1 from sine, no random flips
+  const dir = Math.sin(wPh * Math.PI * 2);
+  // Amplitude slowly varies 0.3..1.0 for gust feel
+  const gust = 0.65 + 0.35 * Math.sin(wPh * 0.7 * Math.PI * 2);
+  // Strength scales with tower height and slowly increases over time
+  const baseStr = 0.00000035 * (1 + (maxH || 1) / 600) * gust;
+  for (const row of layers) { if (!row) continue;
+    for (const e of row) { if (!e || !e.alive || e.body.isStatic) continue;
+      // Altitude factor: wind hits higher blocks harder
+      const alt = 1 + Math.max(0, -e.body.position.y) / 500;
+      Me.Body.applyForce(e.body, e.body.position, {
+        x: baseStr * dir * alt * 400,
+        y: 0
+      });
+    }
+  }
+}
+
+function earn(dt) { money += 2 * (1 + maxH / 30) * (1 + upLvl * 0.08) * dt; }
+
+// ── Camera: always show tower top, zoomed out generously ─────────────
+// Formula: td = max(1200, min(300000, maxH * 1.8 + 1500)), 
+// lookAt at 60% of tower height. Smooth interpolation at 4%/frame.
+let theta = 0.7, phi = 0.5, dist = 2500, panX = 0, panZ = 0;
+let drag = false, dl = {}, panning = false, ps = {}, pc = {};
+function cam() {
+  const ty = Math.max(60, maxH * 0.6);
+  const td = Math.max(1200, Math.min(300000, maxH * 1.8 + 1500));
+  dist += (td - dist) * 0.04;
+  C.position.set(
+    dist * Math.sin(theta) * Math.cos(phi) + panX,
+    Math.max(150, dist * Math.sin(phi) + 200),
+    dist * Math.cos(theta) * Math.cos(phi) + panZ
+  );
+  C.lookAt(panX, ty, panZ);
+}
+
+// ── UI ────────────────────────────────────────────────────────────────
+function toast(m, t) {
+  const e = document.createElement('div'); e.className = 'tt ' + (t || ''); e.textContent = m;
+  document.getElementById('tt').appendChild(e);
+  setTimeout(function () { if (e.parentNode) e.parentNode.removeChild(e); }, 3000);
+}
+
+function updateHUD() {
+  document.getElementById('h-h').textContent = Math.floor(maxH);
+  document.getElementById('h-b').textContent = activeBricks;
+  document.getElementById('h-$').textContent = Math.floor(money);
+  const se = document.getElementById('h-s');
+  se.textContent = collapsing ? '☠ COLLAPSE' : stressPct + '%';
+  se.style.color = collapsing ? '#f44' : stressPct < 40 ? '#8c8' : stressPct < 75 ? '#cc8' : '#f88';
+}
+let hudTimer = 0;
+
+function buyJoint() {
+  if (collapsing) { toast('Nope', 'bad'); return; }
+  const c = 80 * Math.pow(1.5, upLvl); if (money < c) { toast('Need $' + Math.ceil(c), 'bad'); return; }
+  if (upLvl >= 25) { toast('Max!', 'blue'); return; }
+  money -= c; upLvl++; toast('⬆ Lv' + upLvl + ' +' + (upLvl * 80), 'blue'); updateHUD();
+}
+
+function buySpeed() {
+  if (collapsing) { toast('Nope', 'bad'); return; }
+  const c = 10 * Math.pow(2, spdLvl); if (money < c) { toast('Need $' + Math.ceil(c), 'bad'); return; }
+  if (spdLvl >= 15) { toast('Max!', 'blue'); return; }
+  money -= c; spdLvl++; toast('⚡ Lv' + spdLvl, 'blue'); updateHUD();
+}
+
+function buyBigger() {
+  if (collapsing) { toast('Nope', 'bad'); return; }
+  const c = 500 * Math.pow(3, sizeLvl); if (money < c) { toast('Need $' + Math.ceil(c), 'bad'); return; }
+  if (sizeLvl >= 4) { toast('Max!', 'blue'); return; }
+  money -= c; sizeLvl++; G = 3 + sizeLvl; toast('🏗️ ' + G + '×' + G, 'blue'); updateHUD();
+}
+
+document.getElementById('b-up').onclick = buyJoint;
+document.getElementById('b-spd').onclick = buySpeed;
+document.getElementById('b-big').onclick = buyBigger;
+document.getElementById('b-r').onclick = function () { theta = 0.7; phi = 0.5; dist = 2500; panX = 0; panZ = 0; };
+
+// ── Input ─────────────────────────────────────────────────────────────
+R.domElement.addEventListener('pointerdown', function (e) {
+  if (e.button === 1 || e.button === 2) { drag = true; dl = { x: e.clientX, y: e.clientY }; e.preventDefault(); }
+  else if (e.button === 0 && e.shiftKey) { panning = true; ps = { x: e.clientX, y: e.clientY }; pc = { x: panX, z: panZ }; }
+});
+document.addEventListener('pointerup', function (ev) { if (!ev.buttons) { drag = false; panning = false; } });
+document.addEventListener('pointermove', function (e) {
+  if (panning) { panX = pc.x - (e.clientX - ps.x) * 0.5; panZ = pc.z - (e.clientY - ps.y) * 0.5; return; }
+  if (drag) {
+    theta -= (e.clientX - dl.x) * 0.005;
+    phi = Math.max(0.1, Math.min(1.3, phi + (e.clientY - dl.y) * 0.005));
+    dl = { x: e.clientX, y: e.clientY };
+  }
+});
+R.domElement.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  dist = Math.max(1000, Math.min(70000, dist * (e.deltaY < 0 ? 0.9 : 1.1)));
+}, { passive: false });
+addEventListener('resize', function () { C.aspect = innerWidth / innerHeight; C.updateProjectionMatrix(); R.setSize(innerWidth, innerHeight); });
+addEventListener('keydown', function (e) {
+  if (e.code === 'KeyC' || e.code === 'Escape') { theta = 0.7; phi = 0.5; dist = 2500; panX = 0; panZ = 0; }
+  if (e.code === 'KeyU') buyJoint();
+});
+
+// ── Game Loop (precise execution order, Phase 1 spec) ────────────────
+placeBrick();
+toast('🧱 Tower rising...', 'blue');
+let last = 0, acc = 0, ct = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = last ? Math.min((t - last) / 1000, 0.05) : 0.016; last = t;
+
+  // 1. Input — already event-driven
+
+  if (!collapsing) {
+    // 2. Economy (passive income)
+    earn(dt);
+
+    // 3. Automation — place bricks at current speed
+    acc += dt;
+    const interval = Math.max(0.008, 0.025 - spdLvl * 0.0012); // faster with speed upgrades
+    if (acc >= interval) { acc = 0; placeBrick(); }
+
+  }
+  // 4. Physics engine — always runs, even during collapse
+  Me.Engine.update(engine, dt * 1000);
+
+  // Wind keeps blowing during collapse so the tower keeps falling over
+  windTick(dt);
+
+  // During collapse: lighter angular damping lets the tower tip naturally
+  const angDamp = collapsing ? 0.97 : 0.85;
+  for (const row of layers) { if (!row) continue;
+    for (const e of row) { if (e && e.alive && !e.body.isStatic) Me.Body.setAngularVelocity(e.body, e.body.angularVelocity * angDamp); }
+  }
+
+  // 6. Stress solver
+  solveStress(dt);
+
+  // 7. Sync 3D meshes (or update fragments during collapse)
+  sync3D(dt);
+
+  // 8. Color updates (throttled)
+  ct += dt;
+  if (ct > 0.12) { ct = 0; updateColors(); }
+
+  // Camera + HUD (throttled)
+  cam();
+  hudTimer += dt;
+  if (hudTimer > 0.15) { hudTimer = 0; updateHUD(); }
+
+  // Render
+  R.render(S, C);
+}
+
+loop(0);
+console.log('[Tower] v13 — fixed camera, stress smoothing, collapse fragments');
+</script>
+</body></html>

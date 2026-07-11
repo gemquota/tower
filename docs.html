@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tower — Interactive Docs</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    color: #c8d6e5;
+    background: #0b0e14;
+    display: flex;
+  }
+
+  /* ── Sidebar ──────────────────────────────────────────────── */
+  #sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 260px;
+    background: #0f131c;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    overflow-y: auto;
+    padding: 24px 16px;
+    z-index: 10;
+  }
+  #sidebar h2 { font-size: 13px; color: #6a7a8a; text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 8px 12px; }
+  #sidebar h2:first-child { margin-top: 0; }
+  #sidebar a {
+    display: block;
+    padding: 5px 12px;
+    color: #8a9aaa;
+    text-decoration: none;
+    font-size: 14px;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+  }
+  #sidebar a:hover { background: rgba(255,255,255,0.04); color: #e8f0fa; }
+  #sidebar a.active { color: #7ac0ff; background: rgba(100,180,255,0.08); }
+
+  /* ── Main content ─────────────────────────────────────────── */
+  #content {
+    margin-left: 260px;
+    padding: 48px 64px 80px;
+    max-width: 920px;
+  }
+
+  /* ── Typography ───────────────────────────────────────────── */
+  h1 { font-size: 36px; font-weight: 800; color: #e8f0fa; margin-bottom: 6px; letter-spacing: -0.5px; }
+  .subtitle { font-size: 18px; color: #6a8aaa; margin-bottom: 32px; }
+  h2 {
+    font-size: 24px; font-weight: 700; color: #d0e0f0;
+    margin-top: 48px; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  h3 { font-size: 18px; font-weight: 600; color: #b0c8e0; margin-top: 28px; margin-bottom: 8px; }
+  p  { margin-bottom: 14px; color: #b0c0d0; }
+  a  { color: #7ac0ff; }
+  a:hover { color: #a0d8ff; }
+
+  ul, ol { margin-bottom: 14px; padding-left: 24px; }
+  li { margin-bottom: 4px; color: #b0c0d0; }
+
+  strong { color: #e0ecf5; }
+  em { color: #8aaccc; }
+  hr { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 32px 0; }
+
+  /* ── Code blocks ──────────────────────────────────────────── */
+  pre {
+    background: #0d1119;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    color: #d0dce8;
+    margin-bottom: 18px;
+    position: relative;
+  }
+  pre .lang-tag {
+    position: absolute;
+    top: 6px; right: 10px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #4a5a6a;
+    font-weight: 600;
+  }
+  code:not(pre code) {
+    background: rgba(255,255,255,0.06);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.9em;
+    color: #c8d8f0;
+  }
+
+  /* ── Tables ───────────────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 18px;
+    font-size: 14px;
+  }
+  th, td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  th { color: #8a9aaa; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { color: #b0c0d0; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── Callout boxes ─────────────────────────────────────────── */
+  .callout {
+    padding: 12px 16px;
+    margin-bottom: 18px;
+    border-radius: 6px;
+    border-left: 3px solid;
+    font-size: 14px;
+  }
+  .callout.info    { background: rgba(100,180,255,0.08); border-color: #4a9eff; color: #a0c8f0; }
+  .callout.warn    { background: rgba(255,200,50,0.08);  border-color: #eebb33; color: #d0c080; }
+  .callout.tip     { background: rgba(80,220,140,0.08);  border-color: #4ade80; color: #80d8a0; }
+
+  /* ── Interactive collapsible sections ──────────────────────── */
+  details {
+    margin-bottom: 14px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 6px;
+    padding: 6px 14px;
+    cursor: pointer;
+  }
+  details summary {
+    font-weight: 600;
+    color: #b0c8e0;
+    padding: 4px 0;
+    outline: none;
+  }
+  details[open] summary { margin-bottom: 8px; }
+  details .detail-body { padding: 4px 0 8px; }
+
+  /* ── Architecture diagram ──────────────────────────────────── */
+  .phase-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 18px;
+  }
+  .phase-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .phase-num {
+    width: 28px;
+    font-weight: 700;
+    color: #4a6a8a;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .phase-name {
+    width: 150px;
+    font-weight: 600;
+    color: #c8d8f0;
+    flex-shrink: 0;
+  }
+  .phase-desc {
+    color: #7a8a9a;
+    flex: 1;
+  }
+
+  /* ── Tag pills ─────────────────────────────────────────────── */
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .pill.eng { background: rgba(80,160,255,0.15); color: #6ab0ff; }
+  .pill.data { background: rgba(160,120,255,0.15); color: #b090ff; }
+  .pill.core { background: rgba(255,180,60,0.15);  color: #f0b840; }
+
+  /* ── Keyboard shortcuts ────────────────────────────────────── */
+  kbd {
+    display: inline-block;
+    padding: 2px 7px;
+    font-size: 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    color: #d0dce8;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  /* ── Responsive ────────────────────────────────────────────── */
+  @media (max-width: 800px) {
+    body { flex-direction: column; }
+    #sidebar {
+      position: relative;
+      width: 100%;
+      border-right: none;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      max-height: 200px;
+      padding: 16px;
+    }
+    #sidebar h2 { margin-top: 12px; }
+    #content { margin-left: 0; padding: 24px 20px; }
+    .phase-name { width: 110px; }
+  }
+
+  /* ── Smooth fade-in on load ────────────────────────────────── */
+  #content > * { animation: fadeUp 0.4s ease-out forwards; opacity: 0; }
+  #content > *:nth-child(1) { animation-delay: 0.05s; }
+  #content > *:nth-child(2) { animation-delay: 0.08s; }
+  #content > *:nth-child(3) { animation-delay: 0.11s; }
+  #content > *:nth-child(4) { animation-delay: 0.14s; }
+  #content > *:nth-child(5) { animation-delay: 0.17s; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── Hero section ──────────────────────────────────────────── */
+  .hero {
+    text-align: center;
+    padding: 40px 0 32px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    margin-bottom: 32px;
+  }
+  .hero .buildings {
+    font-size: 48px;
+    letter-spacing: 8px;
+    margin-bottom: 8px;
+    opacity: 0.6;
+  }
+  .hero h1 { font-size: 42px; }
+  .hero .subtitle { margin-bottom: 0; }
+  .hero .stats-row {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 16px;
+    font-size: 13px;
+    color: #5a6a7a;
+  }
+  .hero .stats-row span { display: flex; align-items: center; gap: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ──────────────────────────────────────────────── -->
+<nav id="sidebar">
+  <h2>Getting Started</h2>
+  <a href="#overview">Overview</a>
+  <a href="#quick-start">Quick Start</a>
+  <a href="#controls">Controls</a>
+
+  <h2>Architecture</h2>
+  <a href="#modules">Modules</a>
+  <a href="#game-loop">Game Loop</a>
+  <a href="#state">GameState</a>
+
+  <h2>Systems</h2>
+  <a href="#physics">Physics Model</a>
+  <a href="#upgrades">Upgrades</a>
+  <a href="#prestige">Prestige</a>
+  <a href="#achievements">Achievements</a>
+  <a href="#audio">Audio</a>
+  <a href="#rendering">Rendering</a>
+  <a href="#save">Save System</a>
+
+  <h2>Reference</h2>
+  <a href="#structure">Project Structure</a>
+  <a href="#audit">Audit &amp; Fixes</a>
+    <a href="#development">Development</a>
+</nav>
+
+<!-- ── Main content ──────────────────────────────────────────── -->
+<div id="content">
+
+<div class="hero">
+  <div class="buildings">🏗️ 🏛️ 🏙️</div>
+  <h1>Tower</h1>
+  <p class="subtitle">Incremental Physics Builder</p>
+  <div class="stats-row">
+    <span>📦 13 modules</span>
+    <span>📝 ~6,000 lines</span>
+    <span>⚡ 60 fps target</span>
+    <span>🧱 3 materials</span>
+    <span>🏆 20 achievements</span>
+  </div>
+</div>
+
+<!-- ── Overview ──────────────────────────────────────────────── -->
+<section id="overview">
+<h2>Overview</h2>
+<p>Tower is an <strong>incremental / idle physics builder</strong> built with vanilla HTML5 Canvas and <a href="https://brm.io/matter-js/" target="_blank">Matter.js</a>. Every block has real mass, every weld carries real stress, and every collapse is simulated in real time.</p>
+
+<h3>Core Loop</h3>
+<ol>
+  <li><strong>Place blocks</strong> to grow your tower skyward.</li>
+  <li><strong>Earn passive income</strong> that scales with tower height.</li>
+  <li><strong>Buy upgrades</strong> to reduce stress, automate building, and unlock new materials.</li>
+  <li><strong>Prestige</strong> to reset the visible tower in exchange for permanent income multipliers.</li>
+  <li><strong>Unlock achievements</strong> as you hit milestones — then reach even higher.</li>
+</ol>
+</section>
+
+<!-- ── Quick Start ───────────────────────────────────────────── -->
+<section id="quick-start">
+<h2>Quick Start</h2>
+<p>No build step, no bundler, no install. Open in any modern browser:</p>
+<pre><span class="lang-tag">bash</span>cd tower
+python3 -m http.server 8080
+# or
+npx serve .</pre>
+<p>Then open <a href="http://localhost:8080" target="_blank">http://localhost:8080</a>.</p>
+
+<div class="callout info">
+  <strong>Note:</strong> Matter.js is loaded from a CDN (<code>matter-js 0.20.0</code>). An internet connection is required on first load.
+</div>
+</section>
+
+<!-- ── Controls ──────────────────────────────────────────────── -->
+<section id="controls">
+<h2>Controls</h2>
+<table>
+  <tr><th>Input</th><th>Action</th></tr>
+  <tr><td><kbd>Left-click</kbd> on valid position</td><td>Place a block</td></tr>
+  <tr><td><kbd>Right-click</kbd> / <kbd>Middle-click</kbd> + drag</td><td>Pan camera</td></tr>
+  <tr><td><kbd>Scroll wheel</kbd></td><td>Zoom in / out (cursor stays fixed)</td></tr>
+  <tr><td><kbd>G</kbd></td><td>Toggle grid snap</td></tr>
+  <tr><td><kbd>R</kbd></td><td>Cycle material (concrete → steel → reinforced)</td></tr>
+</table>
+<p>Blocks snap to a 10‑unit grid by default. Toggle it off with <kbd>G</kbd> for free placement.</p>
+</section>
+
+<!-- ── Architecture ──────────────────────────────────────────── -->
+<section id="modules">
+<h2>Module Architecture</h2>
+<p>The game is organised as <strong>13 ES6 modules</strong> coordinated by a strict <code>GameLoop</code> with a fixed per-frame execution order. Each module follows the same lifecycle: <code>init(state)</code>, <code>update(dt)</code>, <code>serialize()</code>, <code>deserialize(data, state)</code>.</p>
+
+<div class="phase-list">
+  <div class="phase-row"><span class="phase-num">1</span><span class="phase-name">InputManager</span><span class="phase-desc">Mouse / keyboard / touch capture, ghost preview, camera pan &amp; zoom</span></div>
+  <div class="phase-row"><span class="phase-num">2</span><span class="phase-name">EconomyManager</span><span class="phase-desc">Passive income, upgrade purchase, resource validation</span></div>
+  <div class="phase-row"><span class="phase-num">3</span><span class="phase-name">StatTracker</span><span class="phase-desc">Cumulative metrics, height / prestige change detection</span></div>
+  <div class="phase-row"><span class="phase-num">4</span><span class="phase-name">AchievementManager</span><span class="phase-desc">Data-driven achievement checking</span></div>
+  <div class="phase-row"><span class="phase-num">5</span><span class="phase-name">AutomationManager</span><span class="phase-desc">Auto-builder drone</span></div>
+  <div class="phase-row"><span class="phase-num">6</span><span class="phase-name">PhysicsEngine</span><span class="phase-desc">Matter.js step, body / constraint lifecycle, wind</span></div>
+  <div class="phase-row"><span class="phase-num">7</span><span class="phase-name">EventManager</span><span class="phase-desc">Random wind gusts, micro-impulses</span></div>
+  <div class="phase-row"><span class="phase-num">8</span><span class="phase-name">StressSolver</span><span class="phase-desc">Read constraint forces, break overstressed welds</span></div>
+  <div class="phase-row"><span class="phase-num">9</span><span class="phase-name">RenderManager</span><span class="phase-desc">Canvas 2D: sky, parallax, blocks, stress heatmap, floating text</span></div>
+  <div class="phase-row"><span class="phase-num">10</span><span class="phase-name">UIManager</span><span class="phase-desc">DOM HUD: resources, upgrades, prestige panel, achievement toaster</span></div>
+  <div class="phase-row"><span class="phase-num">11</span><span class="phase-name">SaveManager</span><span class="phase-desc">localStorage persistence (autosave + on-unload)</span></div>
+</div>
+<div class="phase-list">
+  <div class="phase-row" style="padding-left:40px"><span class="phase-name" style="width:auto">AudioManager</span><span class="phase-desc">Web Audio API procedural sounds (no asset files required)</span></div>
+  <div class="phase-row" style="padding-left:40px"><span class="phase-name" style="width:auto">PrestigeSystem</span><span class="phase-desc">Reset logic, reward computation, multiplier recalculation</span></div>
+  <div class="phase-row" style="padding-left:40px"><span class="phase-name" style="width:auto">GameLoop</span><span class="phase-desc">RAF orchestrator, dt capping, phase ordering</span></div>
+</div>
+</section>
+
+<!-- ── Game Loop ─────────────────────────────────────────────── -->
+<section id="game-loop">
+<h2>Game Loop Execution Order</h2>
+<p>The <code>GameLoop</code> uses <code>requestAnimationFrame</code> with a hard cap of 50 ms per frame to prevent physics spiral-of-death after tab-away. The execution order within each tick is:</p>
+
+<pre><span class="lang-tag">fixed order</span> 1. Input           ← ghost calc, placement, camera
+ 2. Economy         ← passive income, offline catch-up
+ 3. Stats           ← detect maxHeight / prestige changes
+ 4. Achievements    ← check locked achievements
+ 5. Automation      ← AI block placement
+ 6. Physics         ← Matter.js step, constraint.reaction set
+ 7. Events          ← wind gusts, micro-impulses
+ 8. Stress          ← read constraint forces, break welds
+ 9. Render          ← Canvas drawing (sky → blocks → FX)
+10. UI              ← DOM HUD (throttled to 100 ms)
+11. Autosave        ← interval-based (every 30 s)</pre>
+
+<p>The critical ordering is <strong>Physics → Events → Stress</strong>: wind is applied AFTER the physics step but BEFORE the stress check, so wind loads are baked into the constraint reaction vectors when the solver evaluates them.</p>
+</section>
+
+<!-- ── GameState ─────────────────────────────────────────────── -->
+<section id="state">
+<h2>Single Source of Truth</h2>
+<p>All mutable game data lives in one serialisable <code>GameState</code> object. Every module receives the same reference at init and reads / writes through it. No module owns private copies of global state.</p>
+
+<details>
+<summary>📄 <code>GameState</code> structure (click to expand)</summary>
+<div class="detail-body">
+<pre><span class="lang-tag">js</span>gameState {
+  resources: { money, steel, research },
+  upgrades:  { "reinforced_steel": { level: 5 }, ... },
+  tower:     { blocks: [{ id, x, y, width, height, 
+                           materialId, stress, health }],
+               currentHeight, maxHeight },
+  camera:    { x, y, zoom, targetBlockId },
+  placement: { active, worldX, worldY, valid, snapEnabled, 
+               snapSize, materialId },
+  achievements: { unlocked: ["first_brick", ...] },
+  prestige:  { currency, multipliers: { money, steel }, resetCount },
+  settings:  { quality, sound, autosaveInterval, musicEnabled },
+  stats:     { totalBlocksPlaced, totalCollapses, playTime,
+               totalMoneyEarned, totalSteelEarned,
+               totalResearchEarned, totalUpgradesPurchased,
+               upgradesMaxed }
+}</pre>
+</div>
+</details>
+</section>
+
+<!-- ── Physics ───────────────────────────────────────────────── -->
+<section id="physics">
+<h2>Physics Model</h2>
+<p>Matter.js handles all rigid-body dynamics with custom weld constraints that simulate structural joints.</p>
+
+<h3>Materials</h3>
+<table>
+  <tr><th>ID</th><th>Name</th><th>Density</th><th>Friction</th><th>Weld Stiffness</th><th>Weld Max Force</th></tr>
+  <tr><td>0</td><td>Concrete</td><td>0.0025</td><td>0.8</td><td>0.65</td><td>80</td></tr>
+  <tr><td>1</td><td>Steel</td><td>0.004</td><td>0.6</td><td>0.85</td><td>200</td></tr>
+  <tr><td>2</td><td>Reinforced</td><td>0.005</td><td>0.7</td><td>0.93</td><td>400</td></tr>
+</table>
+
+<h3>Welds</h3>
+<p>When a block is placed, the <code>PhysicsEngine</code> finds any blocks directly below it (within 6 units vertically, with horizontal overlap) and creates a <code>Matter.Constraint</code> with the material's <code>weldStiffness</code> and <code>weldMaxForce</code>.</p>
+
+<h3>Stress &amp; Failure</h3>
+<p>After every physics step, the <code>StressSolver</code> reads <code>constraint.reaction</code> — the instantaneous force vector the constraint is applying to keep the bodies together. If <code>|reaction| &gt; maxForce</code>, the weld snaps (the constraint is removed from the world). The block becomes loose and falls.</p>
+
+<p>Block stress (displayed in the UI) is the average constraint force across all welds on that block, normalised so 1.0 = at the breaking point.</p>
+
+<h3>Wind</h3>
+<p>Altitude-scaled horizontal force applied each frame during a wind event:</p>
+<pre><span class="lang-tag">math</span>force(y) = baseForce × (1 + |y| / heightScale)</pre>
+<p>This models the atmospheric boundary layer — wind speed increases with height because surface friction diminishes.</p>
+
+<h3>Collision Culling</h3>
+<p>Blocks that fall below <code>y = 5000</code> are removed from both the Matter world and GameState to prevent orphan bodies from consuming CPU cycles.</p>
+</section>
+
+<!-- ── Upgrades ──────────────────────────────────────────────── -->
+<section id="upgrades">
+<h2>Upgrade System</h2>
+<p>Upgrades are defined as data in <code>js/data/upgrades.json</code> and loaded synchronously by the <code>EconomyManager</code>.</p>
+
+<h3>Schema</h3>
+<pre><span class="lang-tag">json</span>{
+  "id": "reinforced_steel",
+  "name": "Reinforced Steel",
+  "tier": 1,
+  "maxLevel": 50,
+  "baseCost": { "money": 100, "steel": 50 },
+  "costMultiplier": 1.15,
+  "effectType": "stress_reduction",
+  "baseValue": 0.03,
+  "valuePerLevel": 0.03
+}</pre>
+
+<h3>Cost Formula</h3>
+<pre><span class="lang-tag">math</span>cost(resource) = baseCost[resource] × costMultiplier ^ level</pre>
+
+<h3>Effect Query</h3>
+<p>Any module calls <code>economy.getEffectValue('stress_reduction')</code> which sums <code>baseValue + level × valuePerLevel</code> across all upgrades of that type.</p>
+
+<h3>Available Upgrades</h3>
+<table>
+  <tr><th>Upgrade</th><th>Tier</th><th>Effect</th><th>Max Level</th></tr>
+  <tr><td>Reinforced Steel</td><td>1</td><td>−3 % stress per level</td><td>50</td></tr>
+  <tr><td>Auto-Builder Drone</td><td>1</td><td>−0.15 s auto-build interval per level</td><td>20</td></tr>
+  <tr><td>Wind Dampener</td><td>2</td><td>−6 % wind force per level</td><td>15</td></tr>
+  <tr><td>Advanced Alloys</td><td>2</td><td>+10 % block health per level</td><td>30</td></tr>
+  <tr><td>Prestige Amplifier</td><td>3</td><td>+5 % prestige token yield per level</td><td>10</td></tr>
+</table>
+</section>
+
+<!-- ── Prestige ──────────────────────────────────────────────── -->
+<section id="prestige">
+<h2>Prestige Cycle</h2>
+<p>Once <code>maxHeight ≥ 500</code>, the prestige button in the side panel becomes active.</p>
+
+<h3>Reward Formula</h3>
+<pre><span class="lang-tag">math</span>base     = ⌊√(maxHeight × 0.5)⌋
+amplifier = 1 + getEffectValue('prestige_amplifier')
+tokens    = ⌊base × amplifier⌋
+
+Examples:
+  height   500 →  15 tokens
+  height  2000 →  31 tokens
+  height  8000 →  63 tokens</pre>
+
+<h3>Income Multiplier</h3>
+<p>Each held prestige token adds +10 % to money and steel income:</p>
+<pre><span class="lang-tag">math</span>multiplier = 1 + tokens × 0.10</pre>
+
+<h3>Reset Preserves</h3>
+<p>Prestige tokens, multipliers, upgrade levels, settings, collapse count, and play time survive the reset. Tower blocks, resources, and camera position are wiped to a fresh state.</p>
+</section>
+
+<!-- ── Achievements ──────────────────────────────────────────── -->
+<section id="achievements">
+<h2>Achievement System</h2>
+<p>20 data-driven achievements with four condition types, checked reactively via the <code>StatTracker</code> → <code>AchievementManager</code> event chain.</p>
+
+<table>
+  <tr><th>Condition Type</th><th>Example</th></tr>
+  <tr><td><code>stat_ge</code></td><td><code>stats.totalBlocksPlaced >= 1000</code></td></tr>
+  <tr><td><code>max_height_ge</code></td><td><code>tower.maxHeight >= 500</code></td></tr>
+  <tr><td><code>prestige_count</code></td><td><code>prestige.resetCount >= 5</code></td></tr>
+  <tr><td><code>upgrade_level</code></td><td><code>upgrades.auto_builder.level >= 20</code></td></tr>
+</table>
+
+<details>
+<summary>🏆 Full achievement list (click to expand)</summary>
+<div class="detail-body">
+<table>
+  <tr><th>Icon</th><th>Name</th><th>Condition</th></tr>
+  <tr><td>🧱</td><td>First Brick</td><td>1 block placed</td></tr>
+  <tr><td>🔨</td><td>Apprentice Builder</td><td>10 blocks placed</td></tr>
+  <tr><td>⚒️</td><td>Master Builder</td><td>100 blocks placed</td></tr>
+  <tr><td>🏗️</td><td>Tower Titan</td><td>1,000 blocks placed</td></tr>
+  <tr><td>☁️</td><td>Skyward</td><td>Height 100</td></tr>
+  <tr><td>⛅</td><td>Cloud Piercer</td><td>Height 500</td></tr>
+  <tr><td>🌤️</td><td>Atmospheric Breach</td><td>Height 2,000</td></tr>
+  <tr><td>🚀</td><td>Space Adjacent</td><td>Height 10,000</td></tr>
+  <tr><td>📐</td><td>Structural Engineer</td><td>10 collapses</td></tr>
+  <tr><td>🛡️</td><td>Indestructible</td><td>100 collapses</td></tr>
+  <tr><td>💰</td><td>Penny Pincher</td><td>$1,000 earned</td></tr>
+  <tr><td>💎</td><td>Millionaire</td><td>$1,000,000 earned</td></tr>
+  <tr><td>👑</td><td>Tycoon</td><td>$1,000,000,000 earned</td></tr>
+  <tr><td>🔬</td><td>Researcher</td><td>1,000 research earned</td></tr>
+  <tr><td>⚙️</td><td>Steel Baron</td><td>10,000 steel earned</td></tr>
+  <tr><td>📈</td><td>Upgrade Enthusiast</td><td>10 upgrade levels purchased</td></tr>
+  <tr><td>⭐</td><td>Maxed Out</td><td>Any upgrade at max level</td></tr>
+  <tr><td>♻️</td><td>New Game Plus</td><td>Prestige once</td></tr>
+  <tr><td>🎖️</td><td>Veteran</td><td>Prestige 5 times</td></tr>
+  <tr><td>🤖</td><td>Self-Aware</td><td>Unlock 19 other achievements</td></tr>
+</table>
+</div>
+</details>
+</section>
+
+<!-- ── Audio ─────────────────────────────────────────────────── -->
+<section id="audio">
+<h2>Audio Engine</h2>
+<p>All sounds are <strong>procedurally generated</strong> via the Web Audio API — no audio files, no CORS issues, no preloading.</p>
+
+<table>
+  <tr><th>Trigger</th><th>Sound Design</th></tr>
+  <tr><td>Block placed</td><td>80–120 Hz sine, 120 ms decay</td></tr>
+  <tr><td>UI click</td><td>800–1200 Hz sine, 40 ms decay</td></tr>
+  <tr><td>Collapse</td><td>Sawtooth sweep 60→20 Hz + white noise burst, 500 ms</td></tr>
+  <tr><td>Achievement</td><td>C5→E5→G5 ascending arpeggio</td></tr>
+  <tr><td>Ambience</td><td>A1 (55 Hz) + A0 (27.5 Hz) sine drones, looped</td></tr>
+</table>
+
+<p>The <code>AudioContext</code> is created on the first user gesture (<kbd>click</kbd> / <kbd>keydown</kbd>) per browser autoplay policy. Volume is controlled by <code>GameState.settings</code> with separate master, SFX, and music gain nodes.</p>
+</section>
+
+<!-- ── Rendering ─────────────────────────────────────────────── -->
+<section id="rendering">
+<h2>Rendering Pipeline</h2>
+<p>The <code>RenderManager</code> draws in this order each frame (after the camera transform is applied):</p>
+
+<ol>
+  <li><strong>Sky gradient</strong> — deep-space black to horizon blue, shifts with camera Y</li>
+  <li><strong>Mountains</strong> — two parallax layers (depth 0.5 / 0.7), jagged silhouettes</li>
+  <li><strong>Clouds</strong> — 30 ellipses at parallax depth 0.15–0.35</li>
+  <li><strong>Ground line</strong> — subtle glow + grid</li>
+  <li><strong>Blocks</strong> — coloured by material, frustum-culled, 3-px bevel, stress red-tint overlay</li>
+  <li><strong>Stress heatmap</strong> — constraint lines coloured green→yellow→red based on <code>|reaction| / maxForce</code></li>
+  <li><strong>Snap particles</strong> — white circles that grow and fade when a weld breaks</li>
+  <li><strong>Ghost preview</strong> — translucent green (valid) or red (invalid) at cursor</li>
+  <li><strong>Floating text</strong> — "+$15", "-10" popups that float upward and fade out</li>
+  <li><strong>Crosshair</strong> — subtle centre-screen indicator</li>
+</ol>
+
+<div class="callout tip">
+  <strong>Performance:</strong> Blocks outside the view frustum (plus 100 px margin) are culled. Stress lines are culled if both endpoints are off-screen. Floating text is trivially cheap.
+</div>
+</section>
+
+<!-- ── Save System ──────────────────────────────────────────── -->
+<section id="save">
+<h2>Save System</h2>
+<p>Saves are written to <code>localStorage</code> under the key <code>tower_save</code>.</p>
+
+<ul>
+  <li><strong>Autosave</strong> every 30 seconds</li>
+  <li><strong>On-unload save</strong> when the page closes</li>
+  <li><strong>Manual wipe</strong> button (double-click confirmation) in the bottom-right corner</li>
+</ul>
+
+<p>The save payload includes:</p>
+<pre><span class="lang-tag">json</span>{
+  "schema":     1,
+  "savedAt":    1712345678000,
+  "playTime":   3600,
+  "maxHeight":  1200,
+  "gameState":  { /* full serialisable state */ },
+  "modules": {
+    "PhysicsEngine":    { "bodies": [...], "constraints": [...] },
+    "AutomationManager": { "nextId": 42, "cooldown": 1.2 },
+    ...
+  }
+}</pre>
+
+<div class="callout info">
+  <strong>Validation:</strong> Each load goes through a 4-step pipeline: JSON parse → schema version check → <code>isValidState()</code> structural validation → field backfill for older saves. Corrupt data is silently discarded.
+</div>
+</section>
+
+<!-- ── Project Structure ────────────────────────────────────── -->
+<section id="structure">
+<h2>Project Structure</h2>
+<pre><span class="lang-tag">tree</span>tower/
+├── index.html              ← Entry point + CSS layout + HUD
+├── README.md
+└── js/
+    ├── main.js             ← Bootstrap, module wiring, cross-module chains
+    ├── state.js            ← GameState typedef, factory, clone, validation
+    ├── constants.js        ← All tunable numbers
+    ├── math.js             ← Pure scaling formulas
+    ├── core/
+    │   ├── GameLoop.js     ← RAF orchestrator, dt capping, phase ordering
+    │   ├── InputManager.js ← Pointer/keyboard capture, ghost, camera
+    │   ├── EconomyManager.js ← Income, upgrades, resource validation
+    │   ├── StatTracker.js  ← Metric monitor + event emitter
+    │   ├── AchievementManager.js ← Data-driven achievement checker
+    │   ├── AutomationManager.js  ← Auto-builder drone
+    │   ├── PhysicsEngine.js ← Matter.js wrapper, welds, wind
+    │   ├── EventManager.js ← Wind gusts, micro-impulses
+    │   ├── StressSolver.js ← Constraint-force stress reader
+    │   ├── RenderManager.js ← Canvas 2D rendering pipeline
+    │   ├── UIManager.js    ← DOM HUD + achievement toaster
+    │   ├── SaveManager.js  ← localStorage persistence
+    │   ├── AudioManager.js ← Web Audio API procedural sounds
+    │   └── PrestigeSystem.js ← Reset + reward + multipliers
+    └── data/
+        ├── upgrades.json       ← 5 upgrades
+        └── achievements.json   ← 20 achievements</pre>
+</section>
+
+<!-- ── Audit ───────────────────────────────────────────── -->
+<section id="audit">
+<h2>Audit &amp; Known Issues</h2>
+<p>The codebase was subjected to a full systems audit covering state integrity, physics memory management, math safety, and rendering performance. <strong>12 issues</strong> were identified and fixed.</p>
+
+<h3>Critical Fixes Applied</h3>
+<table>
+  <tr><th>#</th><th>Issue</th><th>Fix</th></tr>
+  <tr><td>1</td><td><code>EventManager.js</code>: <code>const Matter = window.Matter;</code> was inside a JSDoc <code>/** */</code> block — micro-impulse events crashed with <code>ReferenceError</code></td><td>Moved the declaration outside the comment block</td></tr>
+  <tr><td>2</td><td><code>main.js</code>: StressSolver patch removed blocks from GameState but never called <code>physics.destroyBlock()</code> — orphan Matter bodies leaked on every collapse</td><td>Added <code>physics.destroyBlock(blockId)</code> before GameState removal</td></tr>
+  <tr><td>3</td><td><code>PhysicsEngine.deserialize()</code>: Created a new ground body each save-load without removing the old one — accumulating duplicate grounds</td><td>Added <code>Composite.remove()</code> of old ground before rebuilding</td></tr>
+  <tr><td>4</td><td><code>main.js</code> + <code>GameLoop.js</code>: SaveManager was never registered in the phase list — autosave timer searched for a phase named <code>'SaveManager'</code> that didn't exist</td><td>Added <code>loop.register({name:'SaveManager', ...})</code> to the phase list</td></tr>
+</table>
+
+<h3>High / Medium Fixes</h3>
+<table>
+  <tr><th>#</th><th>Issue</th><th>Fix</th></tr>
+  <tr><td>5</td><td><code>main.js</code>: <code>input._placeBlock</code> was completely replaced (duplicating all placement logic) instead of wrapping the original</td><td>Changed to call <code>origPlaceBlock()</code> then inject hooks</td></tr>
+  <tr><td>6</td><td><code>main.js</code>: Used <code>ui._short()</code> — a private UIManager method, breaking encapsulation</td><td>Moved <code>formatNumber</code>/<code>formatShort</code> to <code>math.js</code> as exported functions, imported by both UIManager and main.js</td></tr>
+  <tr><td>7</td><td><code>main.js</code>: Same replacement pattern for <code>automation._autoPlaceBlock</code></td><td>Changed to wrapper pattern</td></tr>
+  <tr><td>8</td><td><code>EconomyManager.js</code>: Height factor was additive in income formula (income started at 2× at height 0)</td><td>Changed to multiplicative: <code>base × prestige × heightFactor × (1 + upgradeBonus)</code></td></tr>
+  <tr><td>9</td><td><code>PhysicsEngine._cullFallenBlocks()</code>: Incremented <code>totalCollapses</code> for harmless debris removal</td><td>Removed the increment (collapses are tracked by StressSolver only)</td></tr>
+  <tr><td>10</td><td><code>UIManager._eng(n)</code>: Returned <code>"Infinityundefined"</code> for NaN inputs</td><td>Delegated to <code>formatNumber()</code> from <code>math.js</code> which has a <code>!Number.isFinite</code> guard</td></tr>
+  <tr><td>11</td><td><code>math.js costExponential()</code>: Overflows to <code>Infinity</code> at extreme upgrade levels</td><td>Added <code>!Number.isFinite(result)</code> guard returning <code>MAX_SAFE_INTEGER</code></td></tr>
+  <tr><td>12</td><td><code>AchievementManager.js</code>: "Self-Aware" referenced <code>state.stats.otherAchievements</code> which doesn't exist</td><td>Added <code>other_achievements</code> condition type counting unlocked achievements</td></tr>
+</table>
+
+<div class="callout tip">
+  <strong>Architecture Invariants Preserved:</strong> Single source of truth (shared <code>GameState</code>), strict 11-phase GameLoop ordering, deterministic pure-function math, safe persistence with silent corruption handling, and decoupled cross-module communication via GameState mutation + the StatTracker event bus.
+</div>
+</section>
+
+<!-- ── Development ───────────────────────────────────────────── -->
+<section id="development">
+<h2>Development Guide</h2>
+
+<h3>Adding an Upgrade</h3>
+<ol>
+  <li>Add its definition to <code>js/data/upgrades.json</code> AND the <code>UPGRADE_DEFS</code> array in <code>EconomyManager.js</code>.</li>
+  <li>Use <code>economy.getEffectValue('your_effect_type')</code> in the consuming module.</li>
+</ol>
+
+<h3>Adding an Achievement</h3>
+<ol>
+  <li>Add its definition to <code>js/data/achievements.json</code> AND the <code>ACHIEVEMENT_DEFS</code> array in <code>AchievementManager.js</code>.</li>
+  <li>Available condition types: <code>stat_ge</code>, <code>max_height_ge</code>, <code>prestige_count</code>, <code>upgrade_level</code>.</li>
+  <li>Stats emitted by <code>StatTracker</code>: <code>blocks_placed</code>, <code>money_earned</code>, <code>steel_earned</code>, <code>research_earned</code>, <code>collapse</code>, <code>upgrade_purchased</code>, <code>prestige</code>, <code>max_height</code>.</li>
+</ol>
+
+<h3>Module Conventions</h3>
+<p>Every module follows the same interface:</p>
+<ul>
+  <li><code>constructor(...dependencies)</code> — receives external refs</li>
+  <li><code>init(state)</code> — receives shared <code>GameState</code>, builds internal structures</li>
+  <li><code>update(dt)</code> — per-frame logic (if registered in GameLoop)</li>
+  <li><code>serialize()</code> — returns module-specific data or <code>null</code></li>
+  <li><code>deserialize(data, state)</code> — restores from serialized data</li>
+</ul>
+
+<h3>Tech Stack</h3>
+<table>
+  <tr><th>Layer</th><th>Technology</th></tr>
+  <tr><td>Physics</td><td><a href="https://brm.io/matter-js/" target="_blank">Matter.js</a> 0.20.0</td></tr>
+  <tr><td>Rendering</td><td>HTML5 Canvas 2D</td></tr>
+  <tr><td>UI</td><td>Vanilla DOM (CSS Grid / Flexbox)</td></tr>
+  <tr><td>Audio</td><td>Web Audio API (procedural synthesis)</td></tr>
+  <tr><td>Persistence</td><td>localStorage</td></tr>
+  <tr><td>Modules</td><td>ES6 (<code>import</code> / <code>export</code>)</td></tr>
+  <tr><td>Dependencies</td><td>None — Matter.js loaded from CDN</td></tr>
+</table>
+
+<hr>
+<p style="text-align:center;color:#4a5a6a;font-size:13px;margin-top:40px">
+  Built in 7 phases across ~6,000 lines of vanilla JavaScript.
+</p>
+</section>
+
+</div>
+
+<script>
+  // ── Active sidebar link tracking ──────────────────────────────
+  const sections = document.querySelectorAll('section[id]');
+  const links = document.querySelectorAll('#sidebar a');
+
+  function updateActiveLink() {
+    let current = '';
+    for (const section of sections) {
+      const rect = section.getBoundingClientRect();
+      if (rect.top <= 120) current = section.id;
+    }
+    for (const link of links) {
+      link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+    }
+  }
+
+  window.addEventListener('scroll', updateActiveLink);
+  window.addEventListener('load', updateActiveLink);
+
+  // ── Smooth scroll for sidebar clicks ──────────────────────────
+  for (const link of links) {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const id = link.getAttribute('href').slice(1);
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+</script>
+
+</body>
+</html>

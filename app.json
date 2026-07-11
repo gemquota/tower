@@ -1,0 +1,6 @@
+{
+  "title": "Tower Builder",
+  "description": "Build a towering physics-based skyscraper. Stack bricks, manage structural stress, and watch your tower sway in the wind before collapsing under its own weight.",
+  "category": "Game",
+  "icon": "icon.svg"
+}

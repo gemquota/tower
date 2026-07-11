@@ -1,0 +1,152 @@
+{
+  "$schema": "Achievement definitions for Tower",
+  "description": "Each achievement has a unique id, display fields, an unlock condition, and optional stat threshold.",
+  "conditionTypes": {
+    "stat_ge": "Fires when a stat reaches or exceeds the given threshold.",
+    "upgrade_level": "Fires when a specific upgrade reaches the given level.",
+    "prestige_count": "Fires when prestige reset count reaches threshold.",
+    "max_height_ge": "Fires when all-time maxHeight reaches threshold."
+  },
+  "achievements": [
+    {
+      "id": "first_brick",
+      "name": "First Brick",
+      "description": "Place your very first block.",
+      "icon": "🧱",
+      "condition": { "type": "stat_ge", "stat": "totalBlocksPlaced", "threshold": 1 }
+    },
+    {
+      "id": "apprentice_builder",
+      "name": "Apprentice Builder",
+      "description": "Place 10 blocks.",
+      "icon": "🔨",
+      "condition": { "type": "stat_ge", "stat": "totalBlocksPlaced", "threshold": 10 }
+    },
+    {
+      "id": "master_builder",
+      "name": "Master Builder",
+      "description": "Place 100 blocks.",
+      "icon": "⚒️",
+      "condition": { "type": "stat_ge", "stat": "totalBlocksPlaced", "threshold": 100 }
+    },
+    {
+      "id": "tower_titan",
+      "name": "Tower Titan",
+      "description": "Place 1,000 blocks.",
+      "icon": "🏗️",
+      "condition": { "type": "stat_ge", "stat": "totalBlocksPlaced", "threshold": 1000 }
+    },
+    {
+      "id": "skyward",
+      "name": "Skyward",
+      "description": "Reach a height of 100.",
+      "icon": "☁️",
+      "condition": { "type": "max_height_ge", "threshold": 100 }
+    },
+    {
+      "id": "cloud_piercer",
+      "name": "Cloud Piercer",
+      "description": "Reach a height of 500.",
+      "icon": "⛅",
+      "condition": { "type": "max_height_ge", "threshold": 500 }
+    },
+    {
+      "id": "atmospheric_breach",
+      "name": "Atmospheric Breach",
+      "description": "Reach a height of 2,000.",
+      "icon": "🌤️",
+      "condition": { "type": "max_height_ge", "threshold": 2000 }
+    },
+    {
+      "id": "space_adjacent",
+      "name": "Space Adjacent",
+      "description": "Reach a height of 10,000.",
+      "icon": "🚀",
+      "condition": { "type": "max_height_ge", "threshold": 10000 }
+    },
+    {
+      "id": "structural_engineer",
+      "name": "Structural Engineer",
+      "description": "Survive 10 structural collapses.",
+      "icon": "📐",
+      "condition": { "type": "stat_ge", "stat": "totalCollapses", "threshold": 10 }
+    },
+    {
+      "id": "indestructible",
+      "name": "Indestructible",
+      "description": "Survive 100 structural collapses.",
+      "icon": "🛡️",
+      "condition": { "type": "stat_ge", "stat": "totalCollapses", "threshold": 100 }
+    },
+    {
+      "id": "penny_pincher",
+      "name": "Penny Pincher",
+      "description": "Earn a total of $1,000.",
+      "icon": "💰",
+      "condition": { "type": "stat_ge", "stat": "totalMoneyEarned", "threshold": 1000 }
+    },
+    {
+      "id": "millionaire",
+      "name": "Millionaire",
+      "description": "Earn a total of $1,000,000.",
+      "icon": "💎",
+      "condition": { "type": "stat_ge", "stat": "totalMoneyEarned", "threshold": 1000000 }
+    },
+    {
+      "id": "tycoon",
+      "name": "Tycoon",
+      "description": "Earn a total of $1,000,000,000.",
+      "icon": "👑",
+      "condition": { "type": "stat_ge", "stat": "totalMoneyEarned", "threshold": 1000000000 }
+    },
+    {
+      "id": "researcher",
+      "name": "Researcher",
+      "description": "Earn a total of 1,000 research.",
+      "icon": "🔬",
+      "condition": { "type": "stat_ge", "stat": "totalResearchEarned", "threshold": 1000 }
+    },
+    {
+      "id": "steel_baron",
+      "name": "Steel Baron",
+      "description": "Earn a total of 10,000 steel.",
+      "icon": "⚙️",
+      "condition": { "type": "stat_ge", "stat": "totalSteelEarned", "threshold": 10000 }
+    },
+    {
+      "id": "upgrade_enthusiast",
+      "name": "Upgrade Enthusiast",
+      "description": "Purchase 10 total upgrade levels.",
+      "icon": "📈",
+      "condition": { "type": "stat_ge", "stat": "totalUpgradesPurchased", "threshold": 10 }
+    },
+    {
+      "id": "maxed_out",
+      "name": "Maxed Out",
+      "description": "Max out any single upgrade.",
+      "icon": "⭐",
+      "condition": { "type": "stat_ge", "stat": "upgradesMaxed", "threshold": 1 }
+    },
+    {
+      "id": "new_game_plus",
+      "name": "New Game Plus",
+      "description": "Prestige for the first time.",
+      "icon": "♻️",
+      "condition": { "type": "prestige_count", "threshold": 1 }
+    },
+    {
+      "id": "veteran",
+      "name": "Veteran",
+      "description": "Prestige 5 times.",
+      "icon": "🎖️",
+      "condition": { "type": "prestige_count", "threshold": 5 }
+    },
+    {
+      "id": "self_aware",
+      "name": "Self-Aware",
+      "description": "Unlock every other achievement.",
+      "icon": "🤖",
+      "condition": { "type": "other_achievements", "threshold": 19 }
+    }
+  ]
+}
