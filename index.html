@@ -48,7 +48,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0b0f1e;font-family:
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
 <script>
 // ══════════════════════════════════════════════════════════════════════════
-// TOWER BUILDER — v14.2 (Canvas 2D fallback + fixed placement speed)
+// TOWER BUILDER — v14.3 (Three.js only + ground/grid)
 // ══════════════════════════════════════════════════════════════════════════
 
 // ── Error capture ──────────────────────────────────────────────────
@@ -133,28 +133,42 @@ function horizMaxForce() { return collapsing ? strBase() * 0.5 : strBase() * 20;
 var W = innerWidth, H = innerHeight;
 var drag = false, dl = {};
 
-// ── Three.js (try it but don't block) ──────────────────────────────
+// ── Three.js ─────────────────────────────────────────────────────
 var threeOk = false;
-var R3, S3, C3, W3;
+var R3, S3, C3, W3, cx=0, cy=0, cz=1;
 try {
   if (typeof THREE !== 'undefined') {
-    R3 = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // IMPORTANT: Create Scene FIRST before accessing its properties
+    S3 = new THREE.Scene();
+    S3.background = new THREE.Color(0x2a3a5a);
+    // Renderer
+    R3 = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     R3.setSize(innerWidth, innerHeight);
     R3.setPixelRatio(Math.min(devicePixelRatio, 2));
-    R3.setClearColor(0x000000, 0);
-    R3.domElement.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:1';
     R3.setClearColor(0x1a2a3a, 1);
-    S3.background = new THREE.Color(0x2a3a5a);
+    R3.domElement.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:1';
     document.body.appendChild(R3.domElement);
-    S3 = new THREE.Scene();
+    // Camera
     C3 = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 1, 100000);
+    C3.position.set(800, 400, 800);
+    C3.lookAt(0, 0, 0);
+    // Lighting
     S3.add(new THREE.AmbientLight(0x404060, 0.6));
     S3.add(new THREE.HemisphereLight(0x87ceeb, 0x362d59, 0.4));
     var sun = new THREE.DirectionalLight(0xffeedd, 1.5);
     sun.position.set(500, 800, 400); S3.add(sun);
     var fill = new THREE.DirectionalLight(0x8888ff, 0.4);
     fill.position.set(-200, 100, -300); S3.add(fill);
+    // World group
     W3 = new THREE.Group(); S3.add(W3);
+    // Ground
+    var gh = new THREE.GridHelper(20000, 100, 0x2a4a6a, 0x1a2a4a);
+    gh.position.y = -2; S3.add(gh);
+    var gMat = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, roughness: 0.9 });
+    var gPlane = new THREE.Mesh(new THREE.PlaneGeometry(40000, 2000), gMat);
+    gPlane.rotation.x = -Math.PI / 2;
+    gPlane.position.set(0, -49, 0);
+    S3.add(gPlane);
     threeOk = true;
     logEv('three', 'Init OK');
   } else {
@@ -234,7 +248,7 @@ function addMesh(e, ix, iz) {
     try {
       var m = new THREE.Mesh(new THREE.BoxGeometry(BW, BH, BD),
         new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.6, metalness: 0.2 }));
-      m.position.set(mx, -e.y + BH, mz);
+      m.position.set(mx, -e.y, mz); // 3D center = body center
       m._ix = ix; m._iz = iz; m._li = e.layerIdx;
       W3.add(m); e.meshes.push(m); activeBricks++;
     } catch(e) { logEv('mesh3', 'FAIL: ' + (e.message||'?')); }
@@ -365,10 +379,11 @@ function sync3D(dt) {
   try {
     for (var ri = 0; ri < layers.length; ri++) { var row = layers[ri]; if (!row) continue;
       for (var xi = 0; xi < row.length; xi++) { var e = row[xi]; if (!e || !e.alive) continue;
-        var bx = e.body.position.x, by = e.body.position.y, ang = e.body.angle, ca = Math.cos(ang), sa = Math.sin(ang);
+        var bx = e.body.position.x, by = e.body.position.y, ang = e.body.angle;
         for (var mi = 0; mi < (e.meshes||[]).length; mi++) {
           var m = e.meshes[mi]; if (!m) continue;
-          m.position.set(bx + BH*sa, -by + BH*ca, m._iz*SP - OFF());
+          // Sync 3D position to physics body center
+          m.position.set(bx, -by, m._iz*SP - OFF());
           m.rotation.z = -ang;
           // Color by stress
           var s = e.smoothedStress || 0, t = Math.min(1, s/1.2);
@@ -472,7 +487,7 @@ function buildDiag() {
   var alive=0; for(var i=0;i<layers.length;i++){var row=layers[i];if(!row)continue;for(var j=0;j<row.length;j++){var e=row[j];if(e&&e.alive)alive++;}}
   var mins=Math.floor(gameTime/60),secs=Math.floor(gameTime%60);
   var cAlive=0;for(var i=0;i<constraints.length;i++){if(constraints[i]&&constraints[i].con&&!constraints[i].con._broken)cAlive++;}
-  var data=[["⏱ Time",mins+"m "+secs+"s"],["🖼 FPS",currentFps],["🧱 Bricks",totalBricks.toLocaleString()],["📐 Height",Math.floor(maxH/PH)+" layers"],["🔵 Active Bodies",alive],["📏 Grid",G+"×"+G],["🔗 Constraints",cAlive+"/"+constraints.length],["💰 Money",Math.floor(money).toLocaleString()],["⚡ Stress",stressPct+"%"],["💥 Collapsed?",collapsing?"YES":"no"],["⬆ Joint+",upLvl],["⚡ Speed+",spdLvl],["🏗️ Grid+",sizeLvl],["🐞 Version","v14.2"],["📡 3D",threeOk?"YES":"NO"],["📡 Errors",String(_errors.length)]];
+  var data=[["⏱ Time",mins+"m "+secs+"s"],["🖼 FPS",currentFps],["🧱 Bricks",totalBricks.toLocaleString()],["📐 Height",Math.floor(maxH/PH)+" layers"],["🔵 Active Bodies",alive],["📏 Grid",G+"×"+G],["🔗 Constraints",cAlive+"/"+constraints.length],["💰 Money",Math.floor(money).toLocaleString()],["⚡ Stress",stressPct+"%"],["💥 Collapsed?",collapsing?"YES":"no"],["⬆ Joint+",upLvl],["⚡ Speed+",spdLvl],["🏗️ Grid+",sizeLvl],["🐞 Version","v14.3"],["📡 3D",threeOk?"YES":"NO"],["📡 Errors",String(_errors.length)]];
   if(_errors.length>0){data.push(['--- ERRORS ---','']);for(var i=0;i<Math.min(_errors.length,8);i++){var e=_errors[i];data.push(['⚠️ '+(i+1),e.msg.slice(0,100)+(e.line?':'+e.line:'')]);}}
   if(_log.length>0){data.push(['--- LOG ---','']);for(var i=Math.max(0,_log.length-10);i<_log.length;i++)data.push(["📝 "+_log[i].tag,_log[i].msg.slice(0,60)]);}
   var html="";for(var i=0;i<data.length;i++)html+="<div style=display:flex;justify-content:space-between;gap:20px;padding:2px 0><span style=color:#8a9aaa>"+data[i][0]+"</span><span style=color:#d0e4f8>"+data[i][1]+"</span></div>";
@@ -585,7 +600,7 @@ function loop(t) {
 
 logEv('loop','First render');
 loop(0);
-logEv('boot','v14.2 started');
+logEv('boot','v14.3 started');
 </script>
 </body></html>
 /* edited Sat Jul 11 10:36:51 AEST 2026 */
